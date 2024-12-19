@@ -35,7 +35,7 @@ startServer() {
     echo "started $1"
   fi
 }
-
+echo 666
 cd /www/server/panel/pyenv/bin/
 # 启动服务1
 startServer $port1 $serverId1
