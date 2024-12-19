@@ -1,0 +1,68 @@
+syntax="proto3";
+
+package WsProto.Block;
+
+enum MessageId {
+  MSG_NONE      = 0;
+  MSG_HEARTBEAT = 1;          // 心跳协议
+  MSG_LATEST_BLOCK = 102;     // 最近区块
+  MSG_OPEN_RES = 103;         // 开奖结果
+  MSG_ROOM_BET_DATA = 104;    // 房间下注数据
+  MSG_ROOM_USER_BET_DATA = 105; // 房间用户下注数据
+  MSG_EXCEPTION_MSG = 500;    // 异常消息
+}
+
+// 握手
+message HandShake {
+  string open_data = 1;
+}
+
+// 心跳
+message HeartBeat {
+  string ping = 1;
+  string pong = 2;
+}
+
+// 异常消息
+message ExceptionMsg {
+  int32 code = 1;
+  string msg = 2;
+}
+
+// 最近区块
+message LatestBlock {
+  int32 block_number = 1;
+  optional string block_hash = 2;
+  int32 network = 3;
+}
+
+message Result {
+  string game_id = 1; //游戏ID
+  string announce_area = 2; //开奖区域 （牛牛：1-10庄赢 11-20闲赢 21-30和）
+}
+// 开奖结果
+message OpenRes {
+  int32 block_num = 1;
+  string block_hash = 2;
+  int32 timestamp = 3;
+  string transaction_hash = 4;
+  repeated Result results = 5;
+}
+
+// 房间用户下注数据
+message RoomUserBetData {
+  string game_id = 1;
+  int32 bet_level = 2;
+  int32 block_number = 3;
+}
+
+message BetData {
+  repeated int32 user_num = 1;
+  repeated int32 bet_amount = 2;
+}
+// 房间下注数据
+message RoomBetData {
+  string game_id = 1;
+  int32 bet_level = 2;
+  BetData data = 3;
+}
