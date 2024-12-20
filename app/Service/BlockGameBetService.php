@@ -515,46 +515,55 @@ class BlockGameBetService extends BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function slotsLogAdd(array $data)
+    public static function slotsLogAdd(array $data): void
     {
-        $dealWith = new DealWithController();
-        // 添加slots游戏日志
-        $slotsLogData = [];
-        foreach ($data as $d) {
-            $log = [
-                'betId' => $d['bet_id'],
-                'parentBetId' => '',
-                'uid' => $d['uid'],
-                'puid' => $d['puid'],
-                'terrace_name' => 'Hash',
-                'slotsgameid' => $d['game_id'],
-                'game_id' => $d['slots_game_id'],
-                'englishname' => $d['game_name'] ?? '',
-                'cashBetAmount' => $d['bet_amount'],
-                'bonusBetAmount' => 0,
-                'cashWinAmount' => $d['settlement_amount'],
-                'bonusWinAmount' => 0,
-                'cashTransferAmount' => $d['win_lose_amount'],
-                'bonusTransferAmount' => 0,
-                'cashRefundAmount' => $d['refund_amount'] ?? 0,
-                'bonusRefundAmount' => 0,
-                'transaction_id' => '',
-                'betTime' => $d['start_time'],
-                'package_id' => $d['package_id'],
-                'channel' => $d['channel'],
-                'betEndTime' => $d['end_time'],
-                'createtime' => $d['createtime'],
-                'is_consume' => 1,
-                'is_sports' => 0,
-                'is_settlement' => 1,
-                'really_betAmount' => 0
-            ];
-            $slotsLogData[] = $log;
-            // 将数据统一存入到Redis，用户出来以后在统计总输赢,流水等
-            $dealWith->setUserWaterTransferAmount($log);
+        try {
+            self::logger()->alert('666');
+            $dealWith = new DealWithController();
+            // 添加slots游戏日志
+            $slotsLogData = [];
+            foreach ($data as $d) {
+                $log = [
+                    'betId' => $d['bet_id'],
+                    'parentBetId' => '',
+                    'uid' => $d['uid'],
+                    'puid' => $d['puid'],
+                    'terrace_name' => 'Hash',
+                    'slotsgameid' => $d['game_id'],
+                    'game_id' => $d['slots_game_id'],
+                    'englishname' => $d['game_name'] ?? '',
+                    'cashBetAmount' => $d['bet_amount'],
+                    'bonusBetAmount' => 0,
+                    'cashWinAmount' => $d['settlement_amount'],
+                    'bonusWinAmount' => 0,
+                    'cashTransferAmount' => $d['win_lose_amount'],
+                    'bonusTransferAmount' => 0,
+                    'cashRefundAmount' => $d['refund_amount'] ?? 0,
+                    'bonusRefundAmount' => 0,
+                    'transaction_id' => '',
+                    'betTime' => $d['start_time'],
+                    'package_id' => $d['package_id'],
+                    'channel' => $d['channel'],
+                    'betEndTime' => $d['end_time'],
+                    'createtime' => $d['createtime'],
+                    'is_consume' => 1,
+                    'is_sports' => 0,
+                    'is_settlement' => 1,
+                    'really_betAmount' => 0
+                ];
+                $slotsLogData[] = $log;
+                self::logger()->alert('BlockGameBetService.slotsLogAdd：' . var_export($slotsLogData, true));
+                // 将数据统一存入到Redis，用户出来以后在统计总输赢,流水等
+                $dealWith->setUserWaterTransferAmount($log);
+            }
+            if ($slotsLogData) {
+                // 批量插入记录
+                self::getPartTb('slots_log')->insert($slotsLogData);
+            }
+        } catch (\Exception $e) {
+            self::logger()->alert('BlockGameBetService.slotsLogAdd.Exception：' . $e->getMessage());
         }
-        // 批量插入记录
-        self::getPartTb('slots_log')->insert($slotsLogData);
+
     }
 
     /**
