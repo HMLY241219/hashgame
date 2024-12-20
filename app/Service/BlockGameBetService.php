@@ -157,7 +157,6 @@ class BlockGameBetService extends BaseService
             $info = self::getPoolTb('userinfo')->where('uid', $uid)
                 ->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
             if ($info) {
-                $info = $info->toArray();
                 // 数据缓存
                 self::setCache($cacheKey, $info, self::$cacheExpire);
             }
