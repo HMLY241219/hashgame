@@ -83,7 +83,7 @@ class BlockGameService extends BaseService
             $info = self::getPoolTb(self::$tbName)
                 ->where('game_id', $gameId)
                 ->leftJoin('slots_game', self::$tbName.'.game_id', '=', 'slots_game.slotsgameid')
-                ->first([self::$tbName.'.*', 'slots_game.game_id slots_game_id', 'slots_game.englishname slots_game_name']);
+                ->first([self::$tbName.'.*', 'slots_game.game_id as slots_game_id', 'slots_game.englishname as slots_game_name']);
             if ($info) {
                 // 数据缓存
                 self::setCache($hTbName, $info, self::$cacheExpire);
