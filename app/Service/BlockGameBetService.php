@@ -500,10 +500,12 @@ class BlockGameBetService extends BaseService
     public static function saveBetData(array $data): void
     {
         self::getPartTb(self::$tbName)->insert($data);
-
+        self::logger()->alert('777');
         // 添加slots游戏日志
         \Hyperf\Coroutine\go(function () use ($data) {
+            self::logger()->alert('888');
             self::slotsLogAdd($data);
+            self::logger()->alert('999');
         });
     }
 
