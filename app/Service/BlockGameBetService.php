@@ -540,18 +540,18 @@ class BlockGameBetService extends BaseService
                     'cashRefundAmount' => $d['refund_amount'] ?? 0,
                     'bonusRefundAmount' => 0,
                     'transaction_id' => '',
-                    'betTime' => $d['start_time'],
+                    'betTime' => strtotime($d['start_time']),
                     'package_id' => $d['package_id'],
                     'channel' => $d['channel'],
-                    'betEndTime' => $d['end_time'],
-                    'createtime' => $d['create_time'],
+                    'betEndTime' => strtotime($d['end_time']),
+                    'createtime' => strtotime($d['create_time']),
                     'is_consume' => 1,
                     'is_sports' => 0,
                     'is_settlement' => 1,
                     'really_betAmount' => 0
                 ];
                 $slotsLogData[] = $log;
-                self::logger()->alert('BlockGameBetService.slotsLogAdd：' . var_export($slotsLogData, true));
+
                 // 将数据统一存入到Redis，用户出来以后在统计总输赢,流水等
                 $dealWith->setUserWaterTransferAmount($log);
             }
