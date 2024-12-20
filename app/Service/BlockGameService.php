@@ -82,7 +82,7 @@ class BlockGameService extends BaseService
             // 从数据库获取
             $info = self::getPoolTb(self::$tbName)
                 ->where('game_id', $gameId)
-                ->leftJoin('slots_game sg', self::$tbName.'.game_id', '=', 'sg.slotsgameid')
+                ->leftJoin('slots_game as sg', self::$tbName.'.game_id', '=', 'sg.slotsgameid')
                 ->first([self::$tbName.'.*', 'sg.game_id slots_game_id', 'sg.englishname slots_game_name']);
             if ($info) {
                 // 数据缓存
