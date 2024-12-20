@@ -97,6 +97,8 @@ class EnumType
     // 是否有效
     public const BET_IS_VALID_YES = 1; // 有效
     public const BET_IS_VALID_NO = 0; // 无效
+    // 下注用户信息缓存key
+    public const BET_USER_INFO_PREFIX = 'BET_USER_INFO_';
 
     /*开奖期数结算*/
     public const PERIODS_LIST_PREFIX = 'PERIODS_LIST_'; // 开奖期数信息

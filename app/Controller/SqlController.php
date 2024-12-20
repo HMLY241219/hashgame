@@ -153,41 +153,43 @@ class SqlController
         $table = 'br_slots_log_' . ($date ?: date('Ymd'));
         $res = Db::select("SHOW TABLES LIKE '$table'");
         if(!$res){
-            $sql = "CREATE TABLE `$table` (
-                      `betId` varchar(64) NOT NULL  COMMENT '第三方唯一标识',
-                      `parentBetId` varchar(64) DEFAULT NULL COMMENT '上级的betId',
-                      `uid` int(15) NOT NULL COMMENT '用户UID',
-                      `puid` int(15) DEFAULT '0' COMMENT '上级用户UID',
-                      `terrace_name` varchar(25) DEFAULT NULL COMMENT '游戏厂商',
-                      `slotsgameid` varchar(64) NOT NULL COMMENT '第三方游戏id',
-                      `game_id` int(15) NOT NULL DEFAULT 0 COMMENT '平台三方游戏id',
-                      `englishname` varchar(255) DEFAULT NULL COMMENT '第三方游戏英文名称',
-                      `cashBetAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Cash玩家投注额',
-                      `bonusBetAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus玩家投注额',
-                      `cashWinAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Cash结算金额',
-                      `bonusWinAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus结算金额',
-                      `cashTransferAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Cash输赢金额',
-                      `bonusTransferAmount` int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus输赢金额',
-                      `cashRefundAmount` int(15) NOT NULL DEFAULT 0 COMMENT '退还Cash金额当is_settlement为2时退还',
-                      `bonusRefundAmount` int(15) NOT NULL DEFAULT 0 COMMENT '退还Bonus金额当is_settlement为2时退还',
-                      `transaction_id` varchar(255) NOT NULL COMMENT '三方唯一标识',
-                      `betTime` int(11) DEFAULT NULL COMMENT '投注开始时间',
-                      `package_id` int(15) NOT NULL DEFAULT 0 COMMENT '包名id',
-                      `channel` int(15) NOT NULL DEFAULT 0 COMMENT '渠道',
-                      `betEndTime` int(11) DEFAULT NULL COMMENT '投注结束时间',
-                      `createtime` int(11) DEFAULT NULL COMMENT '创建时间',
-                      `is_consume` int(2) NOT NULL DEFAULT 0 COMMENT '是否消费了:1=是,0=否',
-                      `is_sports` int(2) NOT NULL DEFAULT 0 COMMENT '是否体育订单:1=是,0=否',
-                      `is_settlement` int(2) NOT NULL DEFAULT 1  COMMENT'是否结算:1=已完成,0=未结算,2=已退还,3=赢的钱已结算(PP需要这个字段，下注,结果和结算是2个不同接口),4=以回滚(订单变为进行中)',
-                      `really_betAmount` int(15) NOT NULL DEFAULT 0 COMMENT '(sbs)体育实际下注金额',
-                      `other` varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
-                      `other2` varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
-                      `other3` varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
-                      PRIMARY KEY (`betId`),
-                      KEY `game_id` (`game_id`),
-                      KEY `transaction_id` (`transaction_id`),
-                      KEY `uid` (`uid`)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='三方slots游戏历史记录'";
+            $sql = "CREATE TABLE $table (
+                 betId varchar(64) NOT NULL  COMMENT '第三方唯一标识',
+                 parentBetId varchar(64) DEFAULT NULL COMMENT '上级的betId',
+                 uid int(15) NOT NULL COMMENT '用户UID',
+                 puid int(15) DEFAULT '0' COMMENT '上级用户UID',
+                 terrace_name varchar(25) DEFAULT NULL COMMENT '游戏厂商',
+                 slotsgameid varchar(64) NOT NULL COMMENT '第三方游戏id',
+                 game_id int(15) NOT NULL DEFAULT 0 COMMENT '平台三方游戏id',
+                 englishname varchar(255) DEFAULT NULL COMMENT '第三方游戏英文名称',
+                 cashBetAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Cash玩家投注额',
+                 bonusBetAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus玩家投注额',
+                 cashWinAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Cash结算金额',
+                 bonusWinAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus结算金额',
+                 cashTransferAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Cash输赢金额',
+                 bonusTransferAmount int(15) NOT NULL DEFAULT 0 COMMENT 'Bonus输赢金额',
+                 cashRefundAmount int(15) NOT NULL DEFAULT 0 COMMENT '退还Cash金额当is_settlement为2时退还',
+                 bonusRefundAmount int(15) NOT NULL DEFAULT 0 COMMENT '退还Bonus金额当is_settlement为2时退还',
+                 transaction_id varchar(255) NOT NULL COMMENT '三方唯一标识',
+                 betTime int(11) DEFAULT NULL COMMENT '投注开始时间',
+                 package_id int(15) NOT NULL DEFAULT 0 COMMENT '包名id',
+                 channel int(15) NOT NULL DEFAULT 0 COMMENT '渠道',
+                 betEndTime int(11) DEFAULT NULL COMMENT '投注结束时间',
+                 createtime int(11) DEFAULT NULL COMMENT '创建时间',
+                 is_consume int(2) NOT NULL DEFAULT 0 COMMENT '是否消费了:1=是,0=否',
+                 is_sports int(2) NOT NULL DEFAULT 0 COMMENT '是否体育订单:1=是,0=否',
+                 is_settlement int(2) NOT NULL DEFAULT 1  COMMENT'是否结算:1=已完成,0=未结算,2=已退还,3=赢的钱已结算(PP需要这个字段，下注,结果和结算是2个不同接口),4=以回滚(订单变为进行中)',
+                 really_betAmount int(15) NOT NULL DEFAULT 0 COMMENT '(sbs)体育实际下注金额',
+                 other varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
+                 other2 varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
+                 other3 varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
+                 id int(11) NOT NULL AUTO_INCREMENT  COMMENT 'ID',
+                 PRIMARY KEY (id),
+                 CONSTRAINT unique_betId UNIQUE (betId),
+                 KEY game_id (game_id),
+                 KEY transaction_id (transaction_id),
+                 KEY uid (uid)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='三方slots游戏历史记录'";
             Db::select($sql);
 
         }
@@ -208,6 +210,10 @@ class SqlController
                       `bet_way` tinyint(1) NOT NULL COMMENT '下注方式：1（平台余额）、2（地址转账）',
                       `bet_level` tinyint(1) NOT NULL COMMENT '下注等级：1（初级场）、2（中级场）、3（高级场）',
                       `uid` int(11) NOT NULL COMMENT '用户ID',
+                      `puid` int(11) NOT NULL DEFAULT '0' COMMENT '上级用户ID',
+                      `channel` int(11) NOT NULL DEFAULT '0' COMMENT '渠道',
+                      `package_id` int(11) NOT NULL DEFAULT '0' COMMENT '包名id',
+                      `slots_game_id` int(11) NOT NULL DEFAULT '0' COMMENT 'slots游戏ID',
                       `game_id` char(21) NOT NULL COMMENT '游戏ID',
                       `game_name` varchar(100) NOT NULL COMMENT '游戏名称',
                       `network` tinyint(1) NOT NULL DEFAULT '1' COMMENT '区块链网络：1（波场）、2（以太坊）、3（币安）',
@@ -233,7 +239,7 @@ class SqlController
                       `sxfee_amount` int(15) NOT NULL DEFAULT '0' COMMENT '手续费',
                       `settlement_amount` int(15) NOT NULL DEFAULT '0' COMMENT '结算金额',
                       `win_lose_ratio` float(3,2) NOT NULL DEFAULT '0.00' COMMENT '输赢赔付率',
-                      `sxfee_ratio` float(3,2) NOT NULL DEFAULT '0.00' COMMENT '手续费率',
+                      `sxfee_ratio` float(4,3) NOT NULL DEFAULT '0.000' COMMENT '手续费率',
                       `status` tinyint(1) NOT NULL COMMENT '状态：0（待结算）、1（已完成）、2（已退款）',
                       `is_valid` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否有效：0（否）、1（是）',
                       `date` int(8) NOT NULL COMMENT '日期整型加快查询效率',
@@ -242,10 +248,12 @@ class SqlController
                       PRIMARY KEY (`bet_id`) USING BTREE,
                       KEY `index_game_id` (`game_id`),
                       KEY `index_curr_periods` (`curr_periods`) USING BTREE,
-                      KEY `index_open_block` (`open_block`) USING BTREE
+                      KEY `index_open_block` (`open_block`) USING BTREE,
+                      KEY `index_channel` (`channel`) USING BTREE,
+                      KEY `index_package_id` (`package_id`) USING BTREE
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏下注记录表'";
-            Db::select($sql);
 
+            Db::select($sql);
         }
 
     }

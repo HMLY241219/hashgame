@@ -80,7 +80,10 @@ class BlockGameService extends BaseService
         $info = self::getCache($hTbName);
         if (!$info) {
             // 从数据库获取
-            $info = self::getPoolTb(self::$tbName)->where('game_id', $gameId)->first();
+            $info = self::getPoolTb(self::$tbName)
+                ->where('game_id', $gameId)
+                ->leftJoin('slots_game sg', self::$tbName.'.game_id', '=', 'sg.slotsgameid')
+                ->first([self::$tbName.'.*', 'sg.game_id slots_game_id', 'sg.englishname slots_game_name']);
             if ($info) {
                 // 数据缓存
                 self::setCache($hTbName, $info, self::$cacheExpire);
@@ -200,7 +203,7 @@ class BlockGameService extends BaseService
             'slotsgameid' => $blockGame['game_id'] ?? '',
             'image' => $blockGame['icon_img'] ?? '',
             'image2' => $blockGame['cover_img'] ?? '',
-            'terrace_id' => 8,
+            'terrace_id' => 19,
             'type' => 4,
             'updatetime' => strtotime($blockGame['update_time']),
         ];
@@ -208,6 +211,7 @@ class BlockGameService extends BaseService
         // 检测数据是否存在
         $num = self::getPoolTb('slots_game')->where('slotsgameid', $saveData['slotsgameid'])->count();
         if ($num) {
+            unset($saveData['image'], $saveData['image2']); // 不更新图片
             // 更新数据
             self::getPoolTb('slots_game')->where('slotsgameid', $saveData['slotsgameid'])->update($saveData);
         } else {

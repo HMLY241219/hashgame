@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Common\Common;
 use App\Common\User;
+use App\Controller\slots\DealWithController;
 use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
 use App\Service\BlockApi\BlockApiService;
@@ -138,6 +139,34 @@ class BlockGameBetService extends BaseService
     }
 
     /**
+     * 获取下注用户信息
+     * @param $uid
+     * @param bool $cached
+     * @return array
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function getBetUserInfo($uid, bool $cached = false): array
+    {
+        // 从缓存获取
+        $cacheKey = EnumType::BET_USER_INFO_PREFIX.$uid;
+        if ($cached) {
+            $info = self::getCache($cacheKey);
+        } else {
+            $info = self::getPoolTb('userinfo')->where('uid', $uid)
+                ->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
+            if ($info) {
+                $info = $info->toArray();
+                // 数据缓存
+                self::setCache($cacheKey, $info, self::$cacheExpire);
+            }
+        }
+
+        return $info;
+    }
+
+    /**
      * 缓存下注数据
      * @param array $params
      * @return array
@@ -149,7 +178,7 @@ class BlockGameBetService extends BaseService
     {
         $currTime = time();
         // 检测参数
-        list($game, $betData) = self::checkParams($params);
+        list($game, $betData, $uInfo) = self::checkParams($params);
         // 下注区块
         $betBlock = self::getBetBlock($game['network'], $game['play_method']); // 下注区块
         // 缓存key前缀
@@ -182,6 +211,10 @@ class BlockGameBetService extends BaseService
             // 下注数据
             $bd['bet_id'] = Common::createIdSn(5, 'B'); // 生成下注ID;
             $bd['uid'] = $params['uid'];
+            $bd['puid'] = $uInfo['puid'];
+            $bd['channel'] = $uInfo['channel'];
+            $bd['package_id'] = $uInfo['package_id'];
+            $bd['slots_game_id'] = $game['slots_game_id'] ?? 0;
             $bd['bet_way'] = $params['bet_way'] ?? EnumType::BET_WAY_BALANCE; // 下注方式：1（平台余额）、2（地址转账）
             $bd['bet_currency'] = $v['bet_currency']; // 下注币种：1（金币）、2（USDT）、3（TRX）
             $bd['bet_level'] = $v['bet_level']; // 下注等级：1（初级场）、2（中级场）、3（高级场）
@@ -312,14 +345,14 @@ class BlockGameBetService extends BaseService
         }
 
         // 余额下注，检测用户余额
+        $uInfo = self::getBetUserInfo($params['uid']);
         if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) {
-            $uInfo = self::getPoolTb('userinfo')->where('uid', $params['uid'])->first(['uid','coin']);
             if ($uInfo && $uInfo['coin'] < array_sum(array_column($params['bet_data'], 'bet_amount'))) {
                 throw new ErrMsgException('Error code 3008', 3008);
             }
         }
 
-        return [$game, array_values($betData)];
+        return [$game, array_values($betData), $uInfo];
     }
 
     /**
@@ -468,8 +501,73 @@ class BlockGameBetService extends BaseService
     public static function saveBetData(array $data): void
     {
         self::getPartTb(self::$tbName)->insert($data);
+
+        // 添加slots游戏日志
+        \Hyperf\Coroutine\go(function () use ($data) {
+            self::slotsLogAdd($data);
+        });
     }
 
+    /**
+     * 添加slots游戏记录
+     * @param array $data
+     * @return void
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function slotsLogAdd(array $data)
+    {
+        $dealWith = new DealWithController();
+        // 添加slots游戏日志
+        $slotsLogData = [];
+        foreach ($data as $d) {
+            $log = [
+                'betId' => $d['bet_id'],
+                'parentBetId' => '',
+                'uid' => $d['uid'],
+                'puid' => $d['puid'],
+                'terrace_name' => 'Hash',
+                'slotsgameid' => $d['game_id'],
+                'game_id' => $d['slots_game_id'],
+                'englishname' => $d['game_name'] ?? '',
+                'cashBetAmount' => $d['bet_amount'],
+                'bonusBetAmount' => 0,
+                'cashWinAmount' => $d['settlement_amount'],
+                'bonusWinAmount' => 0,
+                'cashTransferAmount' => $d['win_lose_amount'],
+                'bonusTransferAmount' => 0,
+                'cashRefundAmount' => $d['refund_amount'] ?? 0,
+                'bonusRefundAmount' => 0,
+                'transaction_id' => '',
+                'betTime' => $d['start_time'],
+                'package_id' => $d['package_id'],
+                'channel' => $d['channel'],
+                'betEndTime' => $d['end_time'],
+                'createtime' => $d['createtime'],
+                'is_consume' => 1,
+                'is_sports' => 0,
+                'is_settlement' => 1,
+                'really_betAmount' => 0
+            ];
+            $slotsLogData[] = $log;
+            // 将数据统一存入到Redis，用户出来以后在统计总输赢,流水等
+            $dealWith->setUserWaterTransferAmount($log);
+        }
+        // 批量插入记录
+        self::getPartTb('slots_log')->insert($slotsLogData);
+    }
+
+    /**
+     * 获取游戏房间下注统计数据
+     * @param string $gameId
+     * @param int $betLevel
+     * @param $uid
+     * @return array
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
     public static function getGameRoomBetStatisticsData(string $gameId, int $betLevel = EnumType::ROOM_CJ, $uid = null): array
     {
         // 获取游戏信息
