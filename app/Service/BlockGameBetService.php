@@ -499,16 +499,11 @@ class BlockGameBetService extends BaseService
      */
     public static function saveBetData(array $data): void
     {
-        self::logger()->alert('555');
-        var_dump('555');
         self::getPartTb(self::$tbName)->insert($data);
-        self::logger()->alert('777');
+
         // 添加slots游戏日志
         \Hyperf\Coroutine\go(function () use ($data) {
-            self::logger()->alert('888');
-            var_dump('000');
             self::slotsLogAdd($data);
-            self::logger()->alert('999');
         });
     }
 
@@ -523,7 +518,6 @@ class BlockGameBetService extends BaseService
     public static function slotsLogAdd(array $data): void
     {
         try {
-            self::logger()->alert('666');
             $dealWith = new DealWithController();
             // 添加slots游戏日志
             $slotsLogData = [];
@@ -550,7 +544,7 @@ class BlockGameBetService extends BaseService
                     'package_id' => $d['package_id'],
                     'channel' => $d['channel'],
                     'betEndTime' => $d['end_time'],
-                    'createtime' => $d['createtime'],
+                    'createtime' => $d['create_time'],
                     'is_consume' => 1,
                     'is_sports' => 0,
                     'is_settlement' => 1,
