@@ -128,6 +128,9 @@ class BlockGameService extends BaseService
     {
         if(!empty($info['page_bet_rule'])) $info['page_bet_rule'] = json_decode($info['page_bet_rule'], true);
         if(!empty($info['transfer_bet_rule'])) $info['transfer_bet_rule'] = json_decode($info['transfer_bet_rule'], true);
+        // 图片url组装
+        if(!empty($info['icon_img'])) $info['icon_img'] = Common::domain_name_path($info['icon_img']);
+        if(!empty($info['cover_img'])) $info['cover_img'] = Common::domain_name_path($info['cover_img']);
     }
 
     /**
