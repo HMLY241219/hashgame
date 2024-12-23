@@ -601,6 +601,8 @@ class DealWithController
         $Redis->hIncrBy('game_info_' . $slots_log['uid'], 'total_game_num', 1);
         $Redis->expire('game_info_' . $slots_log['uid'], 1296000);
         $this->logger->error("setRedisGameInfo：99");
+        $tmp = $Redis->hGetAll('game_info_' . $slots_log['uid']);
+        $this->logger->error("setRedisGameInfo：game_info_" . var_export($tmp, true));
     }
 
     /**
