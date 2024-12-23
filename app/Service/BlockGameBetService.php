@@ -175,9 +175,6 @@ class BlockGameBetService extends BaseService
      */
     public static function cacheGameBet(array $params): array
     {
-        $aa = Common::createIdSn(5, 'B');
-        var_dump($aa);
-        return [];
         $currTime = time();
         // 检测参数
         list($game, $betData, $uInfo) = self::checkParams($params);
