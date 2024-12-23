@@ -109,4 +109,8 @@ class EnumType
     public const PERIODS_LAST_OPEN_BLOCK_CACHE_3M = 'PERIODS_LAST_OPEN_BLOCK_3M_'; // 3分
     /*用户管理*/
     public const USER_ADDRESS_ACTIVE_AMOUNT = 0.001; // 钱包地址激活金额
+
+    /*排行榜*/
+    public const RANKING_TYPE_WIN_WEEK = 1; // 周中奖类型
+    public const RANKING_TYPE_WIN_MONTH = 2; // 月中奖类型
 }

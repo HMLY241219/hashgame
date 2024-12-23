@@ -517,6 +517,25 @@ class BlockGameController extends AbstractController{
         }
     }
 
+    /**
+     * 中奖排行榜
+     * @return null
+     */
+    #[GetMapping(path: 'ranking/win')]
+    public function winRanking()
+    {
+        // 参数校验
+        $params = $this->request->getQueryParams();
+        try {
+            // 获取数据
+            $res = BlockGameBetService::winRankingList($params['ranking_type'] ?? 'real');
+            return $this->ReturnJson->successFul(200, $res);
+        } catch (\Exception $e) {
+            $this->logger->alert('BlockGameController.winRanking.Exception：' . $e->getMessage());
+            return $this->ReturnJson->failFul($e->getCode());
+        }
+    }
+
     #[PostMapping(path: 'transfer')]
     public function tronTransfer()
     {

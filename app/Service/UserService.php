@@ -74,4 +74,18 @@ class UserService extends BaseService
     {
         return self::getPoolTb(self::$tbName)->where('uid', $uid)->first(['uid', 'coin', 'bonus']);
     }
+
+    /**
+     * 用户下注排行榜
+     * @return \Hyperf\Collection\Collection
+     */
+    public static function userBetRankingList(): \Hyperf\Collection\Collection
+    {
+        return self::getPoolTb(self::$tbName)
+            ->leftJoin('share_strlog', 'share_strlog.uid', '=', 'userinfo.uid')
+            ->select(['userinfo.uid', 'userinfo.total_cash_water_score', 'share_strlog.account', 'share_strlog.nickname'])
+            ->orderBy('total_cash_water_score', 'desc')
+            ->limit(20)
+            ->get();
+    }
 }

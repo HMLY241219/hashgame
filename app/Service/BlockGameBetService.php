@@ -1016,4 +1016,69 @@ class BlockGameBetService extends BaseService
         }
         return $betArea;
     }
+
+    /**
+     * 中奖排行榜
+     * @param string $type
+     * @return array
+     */
+    public static function winRankingList(string $type = 'real'): array
+    {
+        $field = ['bet_id', 'bet_way', 'bet_level', 'uid', 'game_id', 'game_name', 'network', 'open_block',
+            'block_hash', 'transaction_hash', 'bet_amount', 'bet_currency', 'is_win', 'win_lose_amount', 'settlement_amount',
+            'date', 'create_time', 'update_time'];
+        $limitNum = 20; // 每张表查询数据条数
+        $rankingData = match ($type) {
+            // 实时中奖
+            'real' => (function () use ($field, $limitNum) {
+                // 获取今日实时中奖下注记录
+                return self::getPartTb(self::$tbName)->where('is_win', EnumType::BET_IS_WIN_YES)
+                    ->select($field)->orderBy('create_time', 'desc')->limit($limitNum)->get()->toArray();
+            })(),
+            // 日中奖
+            'day' => (function () use ($field, $limitNum) {
+                // 获取今日中奖排行
+                return self::getPartTb(self::$tbName)->where('is_win', EnumType::BET_IS_WIN_YES)
+                    ->select($field)->orderBy('win_lose_amount', 'desc')->limit($limitNum)->get()->toArray();
+            })(),
+            // 周中奖
+            'week' => self::getRankingStatisticsData(EnumType::RANKING_TYPE_WIN_WEEK, $field, $limitNum),
+            // 月中奖
+            'month' => self::getRankingStatisticsData(EnumType::RANKING_TYPE_WIN_MONTH, $field, $limitNum),
+        };
+        $ranking = [];
+        foreach ($rankingData as $k => $v) {
+            if ($k+1 > $limitNum) break;
+            $ranking[] = [
+                'ranking_no' => $k + 1,
+                'game_name' => $v['game_name'],
+                'block_hash' => $v['block_hash'],
+                'transaction_hash' => $v['transaction_hash'],
+                'win_lose_amount' => $v['win_lose_amount'],
+                'create_time' => $v['create_time'],
+            ];
+        }
+        return $ranking;
+    }
+
+    /**
+     * 获取排行榜统计数据
+     * @param int $rankingType
+     * @param array $field
+     * @param int $limitNum
+     * @return array
+     */
+    public static function getRankingStatisticsData(int $rankingType, array $field, int $limitNum): array
+    {
+        $rankingToday = self::getPartTb(self::$tbName)->where('is_win', EnumType::BET_IS_WIN_YES)
+            ->select($field)->orderBy('win_lose_amount', 'desc')->limit($limitNum)->get()->toArray();
+        // 获取排行榜统计数据
+        $rankingStatistics = self::getPoolTb('block_game_bet_ranking')->where('ranking_type', $rankingType)->select()->get()->toArray();
+
+        // 合并今日数据
+        $rankingList = array_merge($rankingStatistics, $rankingToday);
+        // 重新排序
+        array_multisort(array_column($rankingList, 'win_lose_amount'),SORT_DESC, SORT_NUMERIC, $rankingList);
+        return $rankingList;
+    }
 }

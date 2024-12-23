@@ -5,8 +5,6 @@ namespace App\Service;
 use App\Common\Common;
 use App\Enum\EnumType;
 use App\Service\BlockApi\BlockApiService;
-use Hyperf\Coroutine\Exception\ParallelExecutionException;
-use Hyperf\Coroutine\Parallel;
 use Hyperf\DbConnection\Db;
 use function Hyperf\Coroutine\go;
 
