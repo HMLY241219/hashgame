@@ -579,19 +579,17 @@ class DealWithController
             'channel' => $slots_log['channel'],
             'package_id' => $slots_log['package_id'],
         ];
-        $this->logger->error("setRedisGameInfo：66");
+
         $this->setRedisGameInfo($Redis,$data);
-        $this->logger->error("setRedisGameInfo：88");
+
         $hashKeyArray = ['cashBetAmount','bonusBetAmount','cashTransferAmount','bonusTransferAmount','need_cash_score_water','need_bonus_score_water'];
         foreach ($hashKeyArray as $hashKey){
             $value = in_array($hashKey, ['need_cash_score_water', 'need_bonus_score_water'])
                 ? (int)$$hashKey
                 : (int)$slots_log[$hashKey];
-            $this->logger->error("setRedisGameInfo：$value" . $value);
-            $this->logger->error("setRedisGameInfo：$hashKey" . $hashKey);
+
             try {
-                $bb = $Redis->hIncrBy('game_info_' . $slots_log['uid'], $hashKey, $value);
-                $this->logger->error("setRedisGameInfo：22" . $bb);
+                $Redis->hIncrBy('game_info_' . $slots_log['uid'], $hashKey, $value);
             } catch (\Exception $e) {
                 $this->logger->error("Failed to hIncrBy for {$hashKey}: " . $e->getMessage());
             }
@@ -600,9 +598,6 @@ class DealWithController
         //游戏次数+1
         $Redis->hIncrBy('game_info_' . $slots_log['uid'], 'total_game_num', 1);
         $Redis->expire('game_info_' . $slots_log['uid'], 1296000);
-        $this->logger->error("setRedisGameInfo：99");
-        $tmp = $Redis->hGetAll('game_info_' . $slots_log['uid']);
-        $this->logger->error("setRedisGameInfo：game_info_" . var_export($tmp, true));
     }
 
     /**
@@ -612,8 +607,7 @@ class DealWithController
      * @return void
      */
     private function setRedisGameInfo($Redis,$slots_log){
-        $aa = $Redis->hMSet('game_info_'.$slots_log['uid'],$slots_log);
-        $this->logger->error("setRedisGameInfo：00" . $aa);
+        $Redis->hMSet('game_info_'.$slots_log['uid'],$slots_log);
     }
 }
 

@@ -65,4 +65,13 @@ class UserService extends BaseService
             ->get()
             ->toArray();
     }
+
+    /**
+     * @param int $uid
+     * @return mixed
+     */
+    public static function getUserBalance(int $uid): mixed
+    {
+        return self::getPoolTb(self::$tbName)->where('uid', $uid)->first(['uid', 'coin', 'bonus']);
+    }
 }

@@ -17,7 +17,7 @@ class TokenMiddleware implements MiddlewareInterface
 
     private array $except = ['/test/index','/home/userinfo','/active.active/turntable','/active.active/getCash','/Withdrawlog/add',
         '/Auth/editPassword','/slots.Slots/getGameUrl','/sign/signIn','/blockgame/bet','/blockgame/user/bet/statistics','/blockgame/user/address/list',
-        '/blockgame/user/betlog', '/blockgame/room/betdata']; // 检查是否是需要验证Token的控制器和方法 //'Withinfo/add'
+        '/blockgame/user/betlog', '/blockgame/room/betdata', '/blockgame/user/balance']; // 检查是否是需要验证Token的控制器和方法 //'Withinfo/add'
     private string $notControllers = ''; //不需要效验的控制器
     private array $trueControllers = ['Tdslots','pgslots','ppslots','Tasks','test','cq9slots','sbsslots','sboslots','Jlslots','weslots','ezugislots','jdbslots','evolutionslots','spribeslots','jokerslots','bgslots','turboslots','avislots', 'webhook']; //直接通过的控制器，啥都不需要管
     private array $trueFunctions = ['payNotify', 'pushLatestBlock']; //直接通过相似的方法比如支付回调

@@ -280,6 +280,26 @@ class BlockGameController extends AbstractController{
     }
 
     /**
+     * 获取用户余额
+     * @return null
+     */
+    #[GetMapping(path: 'user/balance')]
+    public function getUserBalance()
+    {
+        // 用户ID
+        $uid = $this->request->getAttribute('uid');
+
+        try {
+            // 获取数据
+            $res = UserService::getUserBalance($uid);
+            return $this->ReturnJson->successFul(200, $res);
+        } catch (\Exception $e) {
+            $this->logger->alert('BlockGameController.getUserBalance.Exception：' . $e->getMessage());
+            return $this->ReturnJson->failFul($e->getCode());
+        }
+    }
+
+    /**
      * 游戏周期开奖记录
      * @return null
      */
