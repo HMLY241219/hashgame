@@ -579,9 +579,9 @@ class DealWithController
             'channel' => $slots_log['channel'],
             'package_id' => $slots_log['package_id'],
         ];
-
+        $this->logger->error("setRedisGameInfo：66");
         $this->setRedisGameInfo($Redis,$data);
-
+        $this->logger->error("setRedisGameInfo：88");
         $hashKeyArray = ['cashBetAmount','bonusBetAmount','cashTransferAmount','bonusTransferAmount','need_cash_score_water','need_bonus_score_water'];
         foreach ($hashKeyArray as $hashKey){
             $value = in_array($hashKey, ['need_cash_score_water', 'need_bonus_score_water'])
@@ -598,6 +598,7 @@ class DealWithController
         //游戏次数+1
         $Redis->hIncrBy('game_info_' . $slots_log['uid'], 'total_game_num', 1);
         $Redis->expire('game_info_' . $slots_log['uid'], 1296000);
+        $this->logger->error("setRedisGameInfo：99");
     }
 
     /**
