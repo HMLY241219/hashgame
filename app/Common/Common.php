@@ -275,7 +275,7 @@ class Common
     {
         $str = 'abcdefghijklmnopqrstuvwxyz0123456789';
         $code = date('ymdHis') . substr(microtime(), 2, 3);
-        for ($i = 0; $i <= $suffixLen; $i++) {
+        for ($i = 1; $i <= $suffixLen; $i++) {
             $code .= $str[mt_rand(0, strlen($str)-1)];
         }
 

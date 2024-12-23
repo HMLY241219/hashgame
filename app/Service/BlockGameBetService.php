@@ -175,6 +175,9 @@ class BlockGameBetService extends BaseService
      */
     public static function cacheGameBet(array $params): array
     {
+        $aa = Common::createIdSn(5, 'B');
+        var_dump($aa);
+        return [];
         $currTime = time();
         // 检测参数
         list($game, $betData, $uInfo) = self::checkParams($params);
@@ -499,6 +502,7 @@ class BlockGameBetService extends BaseService
      */
     public static function saveBetData(array $data): void
     {
+        self::logger()->alert('slotsLogAdd1:' . var_export($data, true));
         self::getPartTb(self::$tbName)->insert($data);
 
         // 添加slots游戏日志
