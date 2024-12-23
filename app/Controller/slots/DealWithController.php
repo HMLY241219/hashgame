@@ -587,9 +587,11 @@ class DealWithController
             $value = in_array($hashKey, ['need_cash_score_water', 'need_bonus_score_water'])
                 ? (int)$$hashKey
                 : (int)$slots_log[$hashKey];
-
+            $this->logger->error("setRedisGameInfo：$value" . $value);
+            $this->logger->error("setRedisGameInfo：$hashKey" . $hashKey);
             try {
-                $Redis->hIncrBy('game_info_' . $slots_log['uid'], $hashKey, $value);
+                $bb = $Redis->hIncrBy('game_info_' . $slots_log['uid'], $hashKey, $value);
+                $this->logger->error("setRedisGameInfo：22" . $bb);
             } catch (\Exception $e) {
                 $this->logger->error("Failed to hIncrBy for {$hashKey}: " . $e->getMessage());
             }
@@ -608,7 +610,8 @@ class DealWithController
      * @return void
      */
     private function setRedisGameInfo($Redis,$slots_log){
-        $Redis->hMSet('game_info_'.$slots_log['uid'],$slots_log);
+        $aa = $Redis->hMSet('game_info_'.$slots_log['uid'],$slots_log);
+        $this->logger->error("setRedisGameInfo：00" . $aa);
     }
 }
 
