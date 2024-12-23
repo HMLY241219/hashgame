@@ -521,6 +521,7 @@ class BlockGameBetService extends BaseService
             $dealWith = new DealWithController();
             // 添加slots游戏日志
             $slotsLogData = [];
+            self::logger()->alert('slotsLogAdd1:' . var_export($data, true));
             foreach ($data as $d) {
                 $log = [
                     'betId' => $d['bet_id'],
@@ -556,6 +557,7 @@ class BlockGameBetService extends BaseService
                 $dealWith->setUserWaterTransferAmount($log);
             }
             if ($slotsLogData) {
+                self::logger()->alert('slotsLogAdd2:' . var_export($slotsLogData, true));
                 // 批量插入记录
                 self::getPartTb('slots_log')->insert($slotsLogData);
             }
