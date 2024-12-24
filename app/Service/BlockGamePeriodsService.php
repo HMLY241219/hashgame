@@ -142,6 +142,10 @@ class BlockGamePeriodsService extends BaseService
         $info = self::getPartTb(self::$tbName)->where('curr_periods', $params['periods_no'])->first();
         if (!$info) {
             $blockNumber = self::periodsSettlement($params['periods_no'], $params['network'], false);
+            if ($blockNumber) {
+                // 清除指定的丢失区块
+                self::clearMissBlockCache((string)$blockNumber);
+            }
         } else {
             $blockNumber = $info['block_number'];
         }
@@ -355,7 +359,19 @@ class BlockGamePeriodsService extends BaseService
         } catch (\Throwable $exception) {
             self::logger()->alert('BlockGamePeriodsService.cacheMissBlock.Exception：' . $exception->getMessage());
         }
+    }
 
+    /**
+     * 清除指定的丢失区块
+     * @param string $clearBlockNumber
+     * @return void
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function clearMissBlockCache(string $clearBlockNumber): void
+    {
+        BaseService::hDelCache(EnumType::PERIODS_MISS_BLOCK_CACHE . EnumType::NETWORK_TRX, $clearBlockNumber);
     }
 
     /**
