@@ -107,6 +107,10 @@ class EnumType
     public const PERIODS_LAST_OPEN_BLOCK_CACHE_3S = 'PERIODS_LAST_OPEN_BLOCK_3S_'; // 3秒
     public const PERIODS_LAST_OPEN_BLOCK_CACHE_1M = 'PERIODS_LAST_OPEN_BLOCK_1M_'; // 1分
     public const PERIODS_LAST_OPEN_BLOCK_CACHE_3M = 'PERIODS_LAST_OPEN_BLOCK_3M_'; // 3分
+    // 最后结算区块缓存
+    public const PERIODS_LAST_SETTLEMENT_BLOCK_CACHE = 'PERIODS_LAST_SETTLEMENT_BLOCK_';
+    // 丢失的结算区块缓存
+    public const PERIODS_MISS_BLOCK_CACHE = 'PERIODS_LAST_SETTLEMENT_BLOCK_';
     /*用户管理*/
     public const USER_ADDRESS_ACTIVE_AMOUNT = 0.001; // 钱包地址激活金额
 

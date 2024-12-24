@@ -99,6 +99,27 @@ class BaseService
     }
 
     /**
+     * 设置hash字段缓存
+     * @param string $hTbName
+     * @param string $field
+     * @param $value
+     * @param int $expire
+     * @param string $pool
+     * @return void
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function setFieldCache(string $hTbName, string $field, $value, int $expire = 0, string $pool = 'default'): void
+    {
+        $cache = Common::Redis($pool);
+        $cache->hSet($hTbName, $field, $value);
+        if ($expire > 0) {
+            $cache->expire($hTbName, $expire);
+        }
+    }
+
+    /**
      * 获取缓存
      * @param string $hTbName hash表名
      * @param string $pool 连接池
@@ -110,6 +131,21 @@ class BaseService
     public static function getCache(string $hTbName, string $pool = 'default'): array|bool|\Redis
     {
         return Common::Redis($pool)->hGetAll($hTbName);
+    }
+
+    /**
+     * 获取hash字段缓存
+     * @param string $hTbName
+     * @param string $field
+     * @param string $pool
+     * @return array|bool|\Redis
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function getFieldCache(string $hTbName, string $field, string $pool = 'default'): array|bool|\Redis
+    {
+        return Common::Redis($pool)->hGet($hTbName, $field);
     }
 
     /**
