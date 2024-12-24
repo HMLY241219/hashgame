@@ -7,6 +7,8 @@ use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
 use Carbon\Carbon;
 use Hyperf\DbConnection\Db;
+use MrBrownNL\RandomNicknameGenerator\RandomNicknameGenerator;
+use Yooper\Nicknames;
 
 /**
  * 用户服务
@@ -77,15 +79,80 @@ class UserService extends BaseService
 
     /**
      * 用户下注排行榜
-     * @return \Hyperf\Collection\Collection
+     * @param string $rt
+     * @return array
      */
-    public static function userBetRankingList(): \Hyperf\Collection\Collection
+    public static function userBetRankingList(string $rt): array
     {
-        return self::getPoolTb(self::$tbName)
-            ->leftJoin('share_strlog', 'share_strlog.uid', '=', 'userinfo.uid')
-            ->select(['userinfo.uid', 'userinfo.total_cash_water_score', 'share_strlog.account', 'share_strlog.nickname'])
-            ->orderBy('total_cash_water_score', 'desc')
-            ->limit(20)
-            ->get();
+        switch (strtolower($rt)) {
+            // 周榜
+            case 'week': $rankingType = 2; break;
+            // 月榜
+            case 'month': $rankingType = 3; break;
+            // 日榜
+            case 'day':
+            default: $rankingType = 1; break;
+        }
+        $data = self::getPoolTb('user_bet_ranking')
+            ->where('ranking_type', $rankingType)
+            ->select()
+            ->orderBy('bet_amount', 'desc')
+            ->get()->toArray();
+        foreach ($data as $k => &$v) {
+            $v['ranking_no'] = $k + 1;
+        }
+        return $data;
+    }
+
+    /**
+     * 更新用户下注排行榜数据
+     * @param array $params
+     * @return void
+     */
+    public static function updateUserBetRanking(array $params = []): void
+    {
+        // 随机生成昵称
+        $randomNick = new RandomNicknameGenerator(['useAdjective' => false]);
+        $rankingData = [];
+        // 生成各个榜单数据
+        for ($i = 1; $i <= 20; $i++) {
+            // 日榜
+            $name = $randomNick->generate();
+            $rankingData[] = [
+                'uid' => $i,
+                'account' => $name,
+                'nickname' => $name,
+                'bet_amount' => mt_rand($params['day'][0], $params['day'][1]),
+                'ranking_no' => 0,
+                'ranking_type' => 1,
+            ];
+
+            // 周榜
+            $name = $randomNick->generate();
+            $rankingData[] = [
+                'uid' => $i + 100,
+                'account' => $name,
+                'nickname' => $name,
+                'bet_amount' => mt_rand($params['week'][0], $params['week'][1]),
+                'ranking_no' => 0,
+                'ranking_type' => 2,
+            ];
+
+            // 月榜
+            $name = $randomNick->generate();
+            $rankingData[] = [
+                'uid' => $i + 200,
+                'account' => $name,
+                'nickname' => $name,
+                'bet_amount' => mt_rand($params['month'][0], $params['month'][1]),
+                'ranking_no' => 0,
+                'ranking_type' => 3,
+            ];
+        }
+
+        // 截断表
+        Db::select("TRUNCATE TABLE br_user_bet_ranking");
+        // 插入数据
+        BaseService::getPoolTb('user_bet_ranking')->insert($rankingData);
     }
 }

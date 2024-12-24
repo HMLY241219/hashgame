@@ -35,6 +35,7 @@
         "hyperf/websocket-client": "^3.1",
         "hyperf/websocket-server": "^3.1",
         "iexbase/tron-api": "^5.0",
+        "mrbrownnl/random-nickname-generator": "^3.0",
         "nesbot/carbon": "^2.72"
     },
     "require-dev": {

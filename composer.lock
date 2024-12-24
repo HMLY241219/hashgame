@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b5564d37a2c35c7c19a77afd25d5f75c",
+    "content-hash": "a41c5592406e7bba7b0dc23fe10795ea",
     "packages": [
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -4500,6 +4500,61 @@
                 }
             ],
             "time": "2023-10-27T15:32:31+00:00"
+        },
+        {
+            "name": "mrbrownnl/random-nickname-generator",
+            "version": "3.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/MrBrownNL/random-nickname-generator.git",
+                "reference": "47b258fe31da8b9d9286bb16f0f9676bf19410ef"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/MrBrownNL/random-nickname-generator/zipball/47b258fe31da8b9d9286bb16f0f9676bf19410ef",
+                "reference": "47b258fe31da8b9d9286bb16f0f9676bf19410ef",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "php": "^7.4|^8.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "NicknameGenerator": "MrBrownNL\\RandomNicknameGenerator\\Facades\\NicknameGenerator"
+                    },
+                    "providers": [
+                        "MrBrownNL\\RandomNicknameGenerator\\RandomNicknameGeneratorServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "MrBrownNL\\RandomNicknameGenerator\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Jeroen de Bruijn"
+                }
+            ],
+            "description": "Random nickname generator",
+            "homepage": "https://github.com/mrbrownnl/random-nickname-generator",
+            "keywords": [
+                "mrbrownnl",
+                "random-nickname-generator"
+            ],
+            "support": {
+                "issues": "https://github.com/MrBrownNL/random-nickname-generator/issues",
+                "source": "https://github.com/MrBrownNL/random-nickname-generator/tree/3.0.0"
+            },
+            "time": "2021-08-17T13:57:03+00:00"
         },
         {
             "name": "nesbot/carbon",

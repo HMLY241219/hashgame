@@ -518,11 +518,11 @@ class BlockGameController extends AbstractController{
     }
 
     /**
-     * 中奖排行榜
+     * hash游戏中奖排行榜
      * @return null
      */
-    #[GetMapping(path: 'ranking/win')]
-    public function winRanking()
+    #[GetMapping(path: 'ranking/hashwin')]
+    public function hashWinRanking()
     {
         // 参数校验
         $params = $this->request->getQueryParams();
@@ -532,6 +532,43 @@ class BlockGameController extends AbstractController{
             return $this->ReturnJson->successFul(200, $res);
         } catch (\Exception $e) {
             $this->logger->alert('BlockGameController.winRanking.Exception：' . $e->getMessage());
+            return $this->ReturnJson->failFul($e->getCode());
+        }
+    }
+
+    /**
+     * 下注排行榜
+     * @return null
+     */
+    #[GetMapping(path: 'ranking/userbet')]
+    public function userBetRanking()
+    {
+        // 参数校验
+        $params = $this->request->getQueryParams();
+        try {
+            // 获取数据
+            $res = UserService::userBetRankingList($params['ranking_type'] ?? 'day');
+            return $this->ReturnJson->successFul(200, $res);
+        } catch (\Exception $e) {
+            $this->logger->alert('BlockGameController.betRanking.Exception：' . $e->getMessage());
+            return $this->ReturnJson->failFul($e->getCode());
+        }
+    }
+
+    /**
+     * 更新用户排行榜数据
+     * @return null
+     */
+    #[PostMapping(path: 'update/userbet/ranking')]
+    public function updateUserBetRanking()
+    {
+        // 参数校验
+        $params = $this->request->post();
+        try {
+            UserService::updateUserBetRanking($params);
+            return $this->ReturnJson->successFul();
+        } catch (\Exception $e) {
+            $this->logger->alert('BlockGameController.updateUserBetRanking.Exception：' . $e->getMessage());
             return $this->ReturnJson->failFul($e->getCode());
         }
     }
