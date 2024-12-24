@@ -79,9 +79,6 @@ class PeriodsSettlement extends HyperfCommand
                     $blockNumber = BlockGamePeriodsService::periodsSettlement($block['block_number'], EnumType::NETWORK_TRX);
                     $this->writeLog('Periods Settlement BlockNumber：' . $blockNumber);
                 });
-
-                // 缓存没有结算到丢失的区块
-                $this->cacheMissBlock($block);
             }
 
             Coroutine::sleep($sleepTime);
@@ -114,45 +111,6 @@ class PeriodsSettlement extends HyperfCommand
 //        });
 
         return $block;
-    }
-
-    /**
-     * 缓存丢失的区块
-     * @param array $currBlock
-     * @return void
-     * @throws \Psr\Container\ContainerExceptionInterface
-     * @throws \Psr\Container\NotFoundExceptionInterface
-     * @throws \RedisException
-     */
-    public function cacheMissBlock(array $currBlock): void
-    {
-        try {
-            // 获取最后结算区块
-            $lastBlockCacheKey = EnumType::PERIODS_LAST_SETTLEMENT_BLOCK_CACHE . EnumType::NETWORK_TRX;
-            $lastBlock = BaseService::getCache($lastBlockCacheKey);
-            if ($lastBlock) {
-                // 检测当前结算区块号和最后结算区块号之间差距
-                $diffNum = $currBlock['block_number'] - $lastBlock['block_number'];
-                $this->writeLog('cacheMissBlock.currBlock：' . $currBlock['block_number']);
-                $this->writeLog('cacheMissBlock.lastBlock：' . $lastBlock['block_number']);
-                if ($diffNum > 1) {
-                    // 获取未结算到的区块
-                    $cacheKey = EnumType::PERIODS_MISS_BLOCK_CACHE . EnumType::NETWORK_TRX;
-                    for ($i = 1; $i < $diffNum; $i++) {
-                        $field = (string)($lastBlock['block_number'] + $i);
-                        // 缓存未计算到的区块号
-                        BaseService::setFieldCache($cacheKey, $field, 1);
-                    }
-                }
-            }
-
-            // 缓存最后结算区块
-            BaseService::setCache($lastBlockCacheKey, $currBlock);
-
-        } catch (\Throwable $exception) {
-            $this->writeLog('cacheMissBlock.Exception：' . $exception->getMessage());
-        }
-
     }
 
     /**

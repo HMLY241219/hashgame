@@ -152,12 +152,13 @@ class BlockGamePeriodsService extends BaseService
      * 期数结算
      * @param int $periodsNo 结算指定期数，期数编号
      * @param int $network
+     * @param bool $isAuto 是否是自动结算
      * @return int
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function periodsSettlement(int $periodsNo, int $network = EnumType::NETWORK_TRX): int
+    public static function periodsSettlement(int $periodsNo, int $network = EnumType::NETWORK_TRX, bool $isAuto = true): int
     {
         // 当前开奖区块
         $currOpenBlockNumber = $periodsNo; // 结算指定区块
@@ -174,6 +175,11 @@ class BlockGamePeriodsService extends BaseService
         if (!$openBlockInfo) {
             self::logger()->alert('BlockGamePeriodsService.periodsSettlement：No block info, block number ' . $currOpenBlockNumber);
             return 0;
+        }
+
+        // 缓存没有结算到丢失的区块
+        if ($isAuto) {
+            self::cacheMissBlock($openBlockInfo);
         }
 
         // 游戏期数数据
@@ -316,6 +322,40 @@ class BlockGamePeriodsService extends BaseService
             self::logger()->error('BlockGamePeriodsService.periodsSettlement.Exception：' . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * 缓存丢失的区块
+     * @param array $currBlock
+     * @return void
+     */
+    public static function cacheMissBlock(array $currBlock): void
+    {
+        try {
+            // 获取最后结算区块
+            $lastBlockCacheKey = EnumType::PERIODS_LAST_SETTLEMENT_BLOCK_CACHE . EnumType::NETWORK_TRX;
+            $lastBlock = BaseService::getCache($lastBlockCacheKey);
+            if ($lastBlock) {
+                // 检测当前结算区块号和最后结算区块号之间差距
+                $diffNum = $currBlock['block_number'] - $lastBlock['block_number'];
+                if ($diffNum > 1) {
+                    // 获取未结算到的区块
+                    $cacheKey = EnumType::PERIODS_MISS_BLOCK_CACHE . EnumType::NETWORK_TRX;
+                    for ($i = 1; $i < $diffNum; $i++) {
+                        $field = (string)($lastBlock['block_number'] + $i);
+                        // 缓存未计算到的区块号
+                        BaseService::setFieldCache($cacheKey, $field, 1);
+                    }
+                }
+            }
+
+            // 缓存最后结算区块
+            BaseService::setCache($lastBlockCacheKey, $currBlock);
+
+        } catch (\Throwable $exception) {
+            self::logger()->alert('BlockGamePeriodsService.cacheMissBlock.Exception：' . $exception->getMessage());
+        }
+
     }
 
     /**
