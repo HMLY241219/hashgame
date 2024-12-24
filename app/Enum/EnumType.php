@@ -110,7 +110,7 @@ class EnumType
     // 最后结算区块缓存
     public const PERIODS_LAST_SETTLEMENT_BLOCK_CACHE = 'PERIODS_LAST_SETTLEMENT_BLOCK_';
     // 丢失的结算区块缓存
-    public const PERIODS_MISS_BLOCK_CACHE = 'PERIODS_MISS_BLOCK_CACHE_';
+    public const PERIODS_MISS_BLOCK_CACHE = 'PERIODS_MISS_BLOCK_';
     /*用户管理*/
     public const USER_ADDRESS_ACTIVE_AMOUNT = 0.001; // 钱包地址激活金额
 
