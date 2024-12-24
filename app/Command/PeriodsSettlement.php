@@ -137,8 +137,9 @@ class PeriodsSettlement extends HyperfCommand
                     // 获取未结算到的区块
                     $cacheKey = EnumType::PERIODS_LAST_SETTLEMENT_BLOCK_CACHE . EnumType::NETWORK_TRX;
                     for ($i = 1; $i < $diffNum; $i++) {
+                        $field = (string)($lastBlock['block_number'] + $i);
                         // 缓存未计算到的区块号
-                        BaseService::setFieldCache($cacheKey, $lastBlock['block_number'] + $i, 1);
+                        BaseService::setFieldCache($cacheKey, $field, 1);
                     }
                 }
             }
