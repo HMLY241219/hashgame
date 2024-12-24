@@ -141,7 +141,7 @@ class BlockGamePeriodsService extends BaseService
         // 检测当前期数是否结算
         $info = self::getPartTb(self::$tbName)->where('curr_periods', $params['periods_no'])->first();
         if (!$info) {
-            $blockNumber = self::periodsSettlement($params['periods_no'], $params['network']);
+            $blockNumber = self::periodsSettlement($params['periods_no'], $params['network'], false);
         } else {
             $blockNumber = $info['block_number'];
         }
