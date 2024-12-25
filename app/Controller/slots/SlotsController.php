@@ -80,7 +80,7 @@ class SlotsController extends AbstractController
         $type = $this->request->post('type') ?? 1;//1=全部，2=slots,3=体育
 
         $table = 'slots_log_';
-        $field = "betTime,englishname,(cashBetAmount + bonusBetAmount) as BetAmount,(cashTransferAmount + bonusTransferAmount) as TransferAmount,is_settlement,other";
+        $field = "betTime,terrace_name,englishname,(cashBetAmount + bonusBetAmount) as BetAmount,(cashTransferAmount + bonusTransferAmount) as TransferAmount,is_settlement,other";
 
         if($type == 2){
             $where = [['uid','=',$uid],['is_sports','=',0],['is_settlement','<>',0]];
