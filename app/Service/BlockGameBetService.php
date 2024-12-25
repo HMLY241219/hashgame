@@ -550,7 +550,15 @@ class BlockGameBetService extends BaseService
                     'is_consume' => 1,
                     'is_sports' => 0,
                     'is_settlement' => 1,
-                    'really_betAmount' => 0
+                    'really_betAmount' => 0,
+                    'other' => json_encode([
+                        'block_number' => $d['game_id'],
+                        'block_hash' => $d['block_hash'],
+                        'transaction_hash' => $d['transaction_hash'],
+                        'is_win' => $d['is_win'],
+                        'bet_area' => $d['bet_area'],
+                        'win_lose_amount' => $d['win_lose_amount'],
+                    ])
                 ];
                 $slotsLogData[] = $log;
 
