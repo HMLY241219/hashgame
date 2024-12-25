@@ -203,7 +203,7 @@ class BlockGameService extends BaseService
             'slotsgameid' => $blockGame['game_id'] ?? '',
             'image' => $blockGame['icon_img'] ?? '',
             'image2' => $blockGame['cover_img'] ?? '',
-            'terrace_id' => 19,
+            'terrace_id' => 20,
             'type' => 4,
             'updatetime' => strtotime($blockGame['update_time']),
         ];
