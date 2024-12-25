@@ -399,6 +399,9 @@ class HomeController
                 break;
             case 18:
                 break;
+            case 20:
+                $where['type'] = 20;
+                break;
             default:
                 break;
         }
