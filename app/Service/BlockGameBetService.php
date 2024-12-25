@@ -552,7 +552,7 @@ class BlockGameBetService extends BaseService
                     'is_settlement' => 1,
                     'really_betAmount' => 0,
                     'other' => json_encode([
-                        'block_number' => $d['game_id'],
+                        'block_number' => $d['block_number'],
                         'block_hash' => $d['block_hash'],
                         'transaction_hash' => $d['transaction_hash'],
                         'is_win' => $d['is_win'],
