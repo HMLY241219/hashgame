@@ -102,8 +102,8 @@ class TronNodeService extends BaseService
         $res = $tron->getTransactionInfo($tranHash);
         $aa = $tron->hexString2Utf8('ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
         $bb = $tron->hexString2Utf8('0000000000000000000000000000000000000000000000000000000006026808');
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . var_export($aa, 1));
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . var_export($bb, 1));
+        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
+        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
         // 从远程api获取
 //        $url = self::getApiUrl('wallet/gettransactionbyid', ['value' => $tranHash]);
 //        $res = json_decode(Curl::getSimple($url), true);
