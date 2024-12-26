@@ -104,7 +104,7 @@ class TronNodeService extends BaseService
 
         $aa = $tron->hexString2Address('000000000000000000000000d9dba98845306244a52a73773218dd2b40ab94c1');
         $bb = $tron->hexString2Address('0000000000000000000000007025a3f44e50bead9fe0e63b377b4c318ceab3ff');
-        $cc = $tron->hexString2Utf8('0x0000000000000000000000000000000000000000000000000000000006026808');
+        $cc = $tron->hexString2Utf8('0000000000000000000000000000000000000000000000000000000006026808');
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf83：' . $cc);
