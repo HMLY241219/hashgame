@@ -20,6 +20,7 @@ use App\Service\BlockGameBetService;
 use App\Service\BlockGamePeriodsService;
 use App\Service\BlockGameService;
 use App\Service\UserService;
+use App\Service\WebSocket\SysConfService;
 use Hyperf\HttpServer\Annotation\GetMapping;
 use Hyperf\HttpServer\Annotation\PostMapping;
 use Hyperf\HttpServer\Annotation\Controller;
@@ -472,13 +473,7 @@ class BlockGameController extends AbstractController{
     {
         try {
             // 获取数据
-            $res = [
-                'active_transfer_address' => 'TQNjMq2UfCTVR775r6ANoHR6Dvnf2WxYr5-01',
-                'active_transfer_amount' => '0.01',
-                'active_transfer_currency' => 'USDT',
-                'transfer_address_a' => 'TTk1Jpdh9dPPtnJnYsJzbVYm8P8LqzFQqn',
-                'transfer_address_b' => 'TJydWwBKN3SK5r8dVC8hyeHHUN1Q7kBPd2',
-            ];
+            $res = SysConfService::getHashGameConf();
             return $this->ReturnJson->successFul(200, $res);
         } catch (\Exception $e) {
             $this->logger->alert('BlockGameController.getSysConf.Exception：' . $e->getMessage());

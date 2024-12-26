@@ -8,6 +8,7 @@ use App\Service\BaseService;
 use App\Service\BlockGameBetService;
 use App\Service\BlockGameService;
 use App\Service\UserService;
+use App\Service\WebSocket\SysConfService;
 
 /**
  * 钱包地址交易监控
@@ -29,8 +30,10 @@ class WebHookService extends BaseService
         $check = self::checkParams($params);
         // 网络
         $network = self::getBlockNetworkByChar($params['coin']);
+
         // 检测是否是激活钱包
-        if ($check['amount'] == EnumType::USER_ADDRESS_ACTIVE_AMOUNT) {
+        $conf = SysConfService::getHashGameConf();
+        if ($check['amount'] == $conf['active_transfer_amount']) {
             // 获取交易信息
             $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
             if (!$transactionInfo) {
@@ -69,6 +72,7 @@ class WebHookService extends BaseService
         if (!$transactionInfo) {
             throw new ErrMsgException('Transaction not found');
         }
+
         // 获取转账钱包对应绑定的用户
         $userAddress = self::getPoolTb('user_wallet_address')->where('address', $transactionInfo['from_address'])
             ->where('is_active', 1)->first();

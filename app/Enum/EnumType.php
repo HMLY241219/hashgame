@@ -112,7 +112,13 @@ class EnumType
     // 丢失的结算区块缓存
     public const PERIODS_MISS_BLOCK_CACHE = 'PERIODS_MISS_BLOCK_';
     /*用户管理*/
-    public const USER_ADDRESS_ACTIVE_AMOUNT = 0.001; // 钱包地址激活金额
+    public const USER_TRANSFER_AMOUNT = 0.01; // 钱包地址激活金额
+
+    /*系统配置*/
+    public const SYS_CONF_CACHE_KEY_LIST = 'SYS_CONF_LIST_'; // 系统配置列表缓存key
+    public const SYS_CONF_STATUS_YES = 1; // 系统配置状态-隐藏
+    public const SYS_CONF_STATUS_NO = 0; // 系统配置状态-不隐藏
+    public const SYS_CONF_TYPE_HASH_GAME = 33; // 系统配置类型-hash游戏
 
     /*排行榜*/
     public const RANKING_TYPE_WIN_WEEK = 1; // 周中奖类型
