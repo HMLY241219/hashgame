@@ -131,8 +131,8 @@ class TronNodeService extends BaseService
                 $info['amount'] = $info['amount'] > 0 ? $info['amount']/1000000 : 0;
             }
         } else {
-            self::logger()->alert('TronNodeService.getTransactionInfo：' . var_export($res, 1));
-            self::logger()->alert('TronNodeService.getTransactionInfo：' . var_export($res2, 1));
+            self::logger()->alert('TronNodeService.getTransactionInfo1：' . var_export($res, 1));
+            self::logger()->alert('TronNodeService.getTransactionInfo2：' . var_export($res2, 1));
         }
 
         return $info;
