@@ -916,7 +916,7 @@ class BlockGameBetService extends BaseService
             EnumType::GAME_TYPE_HASH_ZX_3M => self::computeBetAreaHashZX($betAmount),
             // hash幸运、hash牛牛
             EnumType::GAME_TYPE_HASH_XY,EnumType::GAME_TYPE_HASH_XY_1M,EnumType::GAME_TYPE_HASH_XY_3M,
-            EnumType::GAME_TYPE_HASH_NN,EnumType::GAME_TYPE_HASH_NN_1M,EnumType::GAME_TYPE_HASH_NN_3M => 0,
+            EnumType::GAME_TYPE_HASH_NN,EnumType::GAME_TYPE_HASH_NN_1M,EnumType::GAME_TYPE_HASH_NN_3M => 1,
             // hash和值大小
             EnumType::GAME_TYPE_HASH_HZ_DX => self::computeBetAreaHashHZDX($betAmount),
             // hash和值单双

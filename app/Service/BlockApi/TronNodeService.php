@@ -98,10 +98,13 @@ class TronNodeService extends BaseService
      */
     public static function getTransactionInfo(string $tranHash): array
     {
+        $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
+        $res = $tron->getTransactionInfo($tranHash);
         // 从远程api获取
-        $url = self::getApiUrl('wallet/gettransactionbyid', ['value' => $tranHash]);
-        $res = json_decode(Curl::getSimple($url), true);
+//        $url = self::getApiUrl('wallet/gettransactionbyid', ['value' => $tranHash]);
+//        $res = json_decode(Curl::getSimple($url), true);
         $info = [];
+
         if (!empty($res['code']) && $res['code'] === 1 && !empty($res['data'])) {
             $info['hash'] = $res['data']['txid'] ?? '';
             $info['symbol'] = $res['data']['symbol'] ?? '';

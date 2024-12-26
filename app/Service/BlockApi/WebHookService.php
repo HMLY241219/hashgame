@@ -77,7 +77,7 @@ class WebHookService extends BaseService
         }
 
         // 获取钱包地址转账下注区域
-        $betArea = BlockGameBetService::getAddressBetArea($transactionInfo['block_hash'], (int)$check['amount'], $game['game_type_second']);
+        $betArea = BlockGameBetService::getAddressBetArea((int)$check['amount'], $game['game_type_second']);
 
         // 缓存下注数据
         BlockGameBetService::cacheGameBet([
