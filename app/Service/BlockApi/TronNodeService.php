@@ -99,14 +99,15 @@ class TronNodeService extends BaseService
     public static function getTransactionInfo(string $tranHash): array
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
-        $res = $tron->getTransaction($tranHash);
+        $res = $tron->getTransactionInfo($tranHash);
+        $res2 = $tron->getEventByTransactionID($tranHash);
 
         $aa = $tron->hexString2Address('000000000000000000000000d9dba98845306244a52a73773218dd2b40ab94c1');
         $bb = $tron->hexString2Address('0000000000000000000000007025a3f44e50bead9fe0e63b377b4c318ceab3ff');
-        $cc = $tron->hexString2Utf8('0000000000000000000000000000000000000000000000000000000006026808');
+        $cc = $tron->hexString2Utf8('0x0000000000000000000000000000000000000000000000000000000006026808');
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $cc);
+        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf83：' . $cc);
         // 从远程api获取
 //        $url = self::getApiUrl('wallet/gettransactionbyid', ['value' => $tranHash]);
 //        $res = json_decode(Curl::getSimple($url), true);
@@ -131,6 +132,7 @@ class TronNodeService extends BaseService
             }
         } else {
             self::logger()->alert('TronNodeService.getTransactionInfo：' . var_export($res, 1));
+            self::logger()->alert('TronNodeService.getTransactionInfo：' . var_export($res2, 1));
         }
 
         return $info;
