@@ -112,7 +112,7 @@ class TronNodeService extends BaseService
 //        $res = json_decode(Curl::getSimple($url), true);
         $info = [];
 
-        if (!empty($res['id'])) {
+        if (!empty($res['code'])) {
             $info['hash'] = $res['id'] ?? '';
             $info['symbol'] = $res['data']['symbol'] ?? '';
             $info['from_address'] = $res['data']['from'] ?? '';
