@@ -99,9 +99,9 @@ class TronNodeService extends BaseService
     public static function getTransactionInfo(string $tranHash): array
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
-        $res = $tron->getTransactionInfo($tranHash);
-        $aa = $tron->hexString2Utf8('0x41ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
-        $bb = $tron->hexString2Utf8('0x410000000000000000000000000000000000000000000000000000000006026808');
+        $res = $tron->getTransaction($tranHash);
+        $aa = $tron->hexString2Utf8('ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef');
+        $bb = $tron->hexString2Utf8('0000000000000000000000000000000000000000000000000000000006026808');
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
         self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
         // 从远程api获取
