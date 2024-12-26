@@ -100,7 +100,7 @@ class TronNodeService extends BaseService
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
         $res = $tron->getTransactionInfo($tranHash);
-        $res2 = $tron->getTransaction();
+        $res2 = $tron->getTransaction($tranHash);
 //        $aa = $tron->hexString2Address('41d9dba98845306244a52a73773218dd2b40ab94c1');
 //        $bb = $tron->hexString2Address('417025a3f44e50bead9fe0e63b377b4c318ceab3ff');
 //        $cc = hexdec('0000000000000000000000000000000000000000000000000000000006026808');
