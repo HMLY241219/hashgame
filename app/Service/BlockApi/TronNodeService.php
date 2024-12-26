@@ -100,20 +100,20 @@ class TronNodeService extends BaseService
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
         $res = $tron->getTransactionInfo($tranHash);
-//        $res3 = $tron->getTransactionByAddress();
-        $aa = $tron->hexString2Address('41d9dba98845306244a52a73773218dd2b40ab94c1');
-        $bb = $tron->hexString2Address('417025a3f44e50bead9fe0e63b377b4c318ceab3ff');
-        $cc = hexdec('0000000000000000000000000000000000000000000000000000000006026808');
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
-        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf83：' . $cc);
+        $res2 = $tron->getTransaction();
+//        $aa = $tron->hexString2Address('41d9dba98845306244a52a73773218dd2b40ab94c1');
+//        $bb = $tron->hexString2Address('417025a3f44e50bead9fe0e63b377b4c318ceab3ff');
+//        $cc = hexdec('0000000000000000000000000000000000000000000000000000000006026808');
+//        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf81：' . $aa);
+//        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf82：' . $bb);
+//        self::logger()->alert('TronNodeService.getTransactionInfo.hexString2Utf83：' . $cc);
         // 从远程api获取
 //        $url = self::getApiUrl('wallet/gettransactionbyid', ['value' => $tranHash]);
 //        $res = json_decode(Curl::getSimple($url), true);
         $info = [];
 
-        if (!empty($res['code']) && $res['code'] === 1 && !empty($res['data'])) {
-            $info['hash'] = $res['data']['txid'] ?? '';
+        if (!empty($res['id'])) {
+            $info['hash'] = $res['id'] ?? '';
             $info['symbol'] = $res['data']['symbol'] ?? '';
             $info['from_address'] = $res['data']['from'] ?? '';
             $info['to_address'] = $res['data']['to'] ?? '';
@@ -131,6 +131,7 @@ class TronNodeService extends BaseService
             }
         } else {
             self::logger()->alert('TronNodeService.getTransactionInfo1：' . var_export($res, 1));
+            self::logger()->alert('TronNodeService.getTransactionInfo2：' . var_export($res2, 1));
         }
 
         return $info;
