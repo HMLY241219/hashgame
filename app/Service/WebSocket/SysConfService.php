@@ -48,7 +48,7 @@ class SysConfService extends BaseService
 
             $conf = [];
             foreach ($list as $v) {
-                $conf[$v['menu_name']] = $v['value'];
+                $conf[$v['menu_name']] = str_replace('"', '', $v['value']);
             }
             unset($list);
 
