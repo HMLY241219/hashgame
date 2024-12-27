@@ -4,7 +4,6 @@ namespace App\Service\WebSocket;
 
 use App\Enum\EnumType;
 use App\Service\BaseService;
-use Yooper\Nicknames;
 
 /**
  * 系统配置服务
