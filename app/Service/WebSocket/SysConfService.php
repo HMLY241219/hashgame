@@ -36,7 +36,7 @@ class SysConfService extends BaseService
             $order = empty($params['order']) ? 'sort desc' : $params['order'];
 
             $list = self::getPoolTb(self::$tbName)
-                ->where('status', EnumType::SYS_CONF_STATUS_NO)
+                ->where('status', EnumType::SYS_CONF_STATUS_YES)
                 ->when(!empty($params['config_tab_id']), function ($query) use ($params) {
                     $query->where('config_tab_id', $params['config_tab_id']);
                 })
