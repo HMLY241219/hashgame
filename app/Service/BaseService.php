@@ -166,14 +166,15 @@ class BaseService
     /**
      * 遍历缓存键值
      * @param int $cursor
+     * @param string $prefix
      * @param string $pool
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      */
-    public static function scanCacheKeys(int $cursor = 0, string $pool = 'default'): array|bool|\Redis
+    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'default'): array|bool|\Redis
     {
-        return Common::Redis($pool)->scan($cursor);
+        return Common::Redis($pool)->scan($cursor, $prefix, 20);
     }
 
     /**

@@ -111,8 +111,6 @@ class EnumType
     public const PERIODS_LAST_SETTLEMENT_BLOCK_CACHE = 'PERIODS_LAST_SETTLEMENT_BLOCK_';
     // 丢失的结算区块缓存
     public const PERIODS_MISS_BLOCK_CACHE = 'PERIODS_MISS_BLOCK_';
-    /*用户管理*/
-    public const USER_TRANSFER_AMOUNT = 0.01; // 钱包地址激活金额
 
     /*系统配置*/
     public const SYS_CONF_CACHE_KEY_LIST = 'SYS_CONF_LIST_'; // 系统配置列表缓存key

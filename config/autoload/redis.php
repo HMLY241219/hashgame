@@ -87,8 +87,8 @@ return [
         ],
     ],
     'RedisMy6379' => [ //注意这里链接的
-        'host' => '127.0.0.1',
-        'auth' => null,
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'auth' => env('REDIS_AUTH', null),
         'port' => 6379, //正式环境
 //        'port' => 5501, //测试docker环境
         'db' => 0,//(int) env('REDIS_DB', 0),
@@ -102,8 +102,8 @@ return [
         ],
     ],
     'RedisMy6379_1' => [ //注意这里链接的
-        'host' => '127.0.0.1',
-        'auth' => null,
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'auth' => env('REDIS_AUTH', null),
         'port' => 6379, //正式环境
 //        'port' => 5501, //测试docker环境
         'db' => 1,//(int) env('REDIS_DB', 0),
@@ -117,8 +117,8 @@ return [
         ],
     ],
     'RedisMy6379_2' => [ //注意这里链接的
-        'host' => '127.0.0.1',
-        'auth' => null,
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'auth' => env('REDIS_AUTH', null),
         'port' => 6379, //正式环境
 //        'port' => 5501, //测试docker环境
         'db' => 2,//(int) env('REDIS_DB', 0),
@@ -132,8 +132,8 @@ return [
         ],
     ],
     'RedisMy6379_3' => [ //注意这里链接的
-        'host' => '127.0.0.1',
-        'auth' => null,
+        'host' => env('REDIS_HOST', '127.0.0.1'),
+        'auth' => env('REDIS_AUTH', null),
         'port' => 6379, //正式环境
 //        'port' => 5501, //测试docker环境
         'db' => 3,//(int) env('REDIS_DB', 0),

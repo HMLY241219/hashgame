@@ -147,7 +147,7 @@ class BlockGamePeriodsService extends BaseService
                 self::clearMissBlockCache((string)$blockNumber, (int)$params['network']);
             }
         } else {
-            $blockNumber = $info['block_number'];
+            $blockNumber = $info['open_block'];
         }
         return ['block_number' => $blockNumber];
     }
@@ -230,11 +230,15 @@ class BlockGamePeriodsService extends BaseService
             // 根据开奖结果获取下注结果
             $betRes = self::getBetResult($betData, $openPeriods['open_result'], json_decode($openPeriods['open_data'], true), $openRule, (int)$betData['game_type_second']);
             $betData['is_win'] = $betRes['is_win']; // 输赢状态
-            $betData['win_lose_amount'] = $betRes['win_lose_amount']; // 输赢金额
-            $betData['settlement_amount'] = $betRes['settlement_amount']; // 结算金额
+            $betData['win_lose_amount'] = $betRes['win_lose_amount']; // 输赢金额-cash
+            $betData['win_lose_amount_bonus'] = $betRes['win_lose_amount_bonus']; // 输赢金额-bonus
+            $betData['settlement_amount'] = $betRes['settlement_amount']; // 结算金额-cash
+            $betData['settlement_amount_bonus'] = $betRes['settlement_amount_bonus']; // 结算金额-bonus
             $betData['sxfee_ratio'] = $betRes['sxfee_ratio'] ?? 0; // 手续费率
-            $betData['sxfee_amount'] = $betRes['sxfee_amount'] ?? 0; // 手续费
-            $betData['refund_amount'] = $betRes['refund_amount'] ?? 0; // 退还金额
+            $betData['sxfee_amount'] = $betRes['sxfee_amount'] ?? 0; // 手续费-cash
+            $betData['sxfee_amount_bonus'] = $betRes['sxfee_amount_bonus'] ?? 0; // 手续费-bonus
+            $betData['refund_amount'] = $betRes['refund_amount'] ?? 0; // 退还金额-cash
+            $betData['refund_amount_bonus'] = $betRes['refund_amount_bonus'] ?? 0; // 退还金额-bonus
             $betData['status'] = $betRes['status']; // 下注状态：0（待结算）、1（已完成）、2（已退款）
 
             // 当前开奖数据统计
@@ -242,14 +246,19 @@ class BlockGamePeriodsService extends BaseService
                 $gamePeriodsList[$betData['game_id']]['bet_user_num'] += 1; // 当期下注人数
                 $betUsers[] = $betData['uid'];
             }
-            $gamePeriodsList[$betData['game_id']]['bet_total_amount'] += $betData['bet_amount'];
+            $gamePeriodsList[$betData['game_id']]['bet_total_amount'] += ($betData['bet_amount'] + $betData['bet_amount_bonus']);
 
             // 用户余额变更（下注方式为余额下注）
             if ($betData['bet_way'] == EnumType::BET_WAY_BALANCE) {
                 if (isset($userCoinChange[$betData['uid']])) {
                     $userCoinChange[$betData['uid']]['coin_change'] += $betData['settlement_amount'];
+                    $userCoinChange[$betData['uid']]['bonus_change'] += $betData['settlement_amount_bonus'];
                 } else {
-                    $userCoinChange[$betData['uid']] = ['uid' => $betData['uid'], 'coin_change' => $betData['settlement_amount']];
+                    $userCoinChange[$betData['uid']] = [
+                        'uid' => $betData['uid'],
+                        'coin_change' => $betData['settlement_amount'],
+                        'bonus_change' => $betData['settlement_amount_bonus'],
+                    ];
                 }
             }
 
@@ -263,11 +272,11 @@ class BlockGamePeriodsService extends BaseService
         }
 
         // 组装用户余额变更日志记录
-        $userCoinLogs = [];
+        $userCoinLogs = $userBonusLogs = [];
         if ($userCoinChange) {
             // 获取所有结算用户信息
             $betUsersTmp = self::getPoolTb('userinfo')->whereIn('uid', array_keys($userCoinChange))
-                ->select('uid', 'coin', 'channel', 'package_id')->get()->toArray();
+                ->select('uid', 'coin', 'bonus', 'channel', 'package_id')->get()->toArray();
             $betUsers = [];
             foreach ($betUsersTmp as $user) {
                 $betUsers[$user['uid']] = $user;
@@ -276,25 +285,37 @@ class BlockGamePeriodsService extends BaseService
             // 组装用户余额变更日志记录
             $currTime = time();
             foreach ($betDataList as $bet) {
-                if ($bet['bet_way'] == EnumType::BET_WAY_TRANSFER || $bet['settlement_amount'] <= 0) continue;
-                // 余额变更日志
-                $betUsers[$bet['uid']]['coin'] += $bet['settlement_amount']; // 用户余额累加
-                $userCoinLogs[] = [
+                if ($bet['bet_way'] == EnumType::BET_WAY_TRANSFER) continue;
+                $logTmp = [
                     'uid' => $bet['uid'],
-                    'num' => $bet['settlement_amount'],
-                    'total' => $betUsers[$bet['uid']]['coin'],
+                    'num' => 0,
+                    'total' => 0,
                     'reason' => 1,
-                    'type' => $bet['settlement_amount'] > 0 ? 1 : 0,
-                    'content' => "订单[{$bet['bet_id']}]下注结算",
+                    'type' => 1,
+                    'content' => "hash游戏订单[{$bet['bet_id']}]下注结算",
                     'channel' => $betUsers[$bet['uid']]['channel'],
                     'package_id' => $betUsers[$bet['uid']]['package_id'],
                     'createtime' => $currTime,
                 ];
+                if ($bet['settlement_amount'] > 0) {
+                    // 余额变更日志
+                    $betUsers[$bet['uid']]['coin'] += $bet['settlement_amount']; // 用户余额累加-cash
+                    $logTmp['num'] = $bet['settlement_amount'];
+                    $logTmp['total'] = $betUsers[$bet['uid']]['coin'];
+                    $userCoinLogs[] = $logTmp;
+                }
+                if ($bet['settlement_amount_bonus'] > 0) {
+                    // 余额变更日志
+                    $betUsers[$bet['uid']]['bonus'] += $bet['settlement_amount_bonus']; // 用户余额累加-bonus
+                    $logTmp['num'] = $bet['settlement_amount_bonus'];
+                    $logTmp['total'] = $betUsers[$bet['uid']]['bonus'];
+                    $userBonusLogs[] = $logTmp;
+                }
             }
         }
 
         try {
-            Db::transaction(function () use ($betDataList, $gamePeriodsList, $settlementCacheKeys, $userCoinChange, $userCoinLogs) {
+            Db::transaction(function () use ($betDataList, $gamePeriodsList, $settlementCacheKeys, $userCoinChange, $userCoinLogs, $userBonusLogs) {
                 // 保存当前开奖期数数据
                 self::getPartTb(self::$tbName)->insert(array_values($gamePeriodsList));
                 // 保存下注数据
@@ -302,13 +323,17 @@ class BlockGamePeriodsService extends BaseService
                     BlockGameBetService::saveBetData($betDataList);
                     unset($betDataList);
                 }
-
                 // 更新用户余额
                 if ($userCoinChange) {
                     UserService::batchUpdateUserCoin($userCoinChange);
                     // 新增余额变更日志
-                    self::getPartTb('coin')->insert($userCoinLogs);
-                    unset($userCoinChange, $userCoinLogs);
+                    if ($userCoinLogs) {
+                        self::getPartTb('coin')->insert($userCoinLogs);
+                    }
+                    if ($userBonusLogs) {
+                        self::getPartTb('bonus')->insert($userBonusLogs);
+                    }
+                    unset($userCoinChange, $userCoinLogs, $userBonusLogs);
                 }
             });
             // 清除下注缓存数据
@@ -697,9 +722,12 @@ class BlockGamePeriodsService extends BaseService
         $result = [
             'is_win' => EnumType::BET_IS_WIN_YES,
             'win_lose_ratio' => 0, // 输赢赔率
-            'win_lose_amount' => 0, // 输赢金额
-            'settlement_amount' => 0, // 结算金额
-            'sxfee_amount' => 0, // 手续费
+            'win_lose_amount' => 0, // 输赢金额-cash
+            'win_lose_amount_bonus' => 0, // 输赢金额-bonus
+            'settlement_amount' => 0, // 结算金额-cash
+            'settlement_amount_bonus' => 0, // 结算金额-bonus
+            'sxfee_amount' => 0, // 手续费-cash
+            'sxfee_amount_bonus' => 0, // 手续费-bonus
             'sxfee_ratio' => 0, // 手续费率
             'status' => EnumType::BET_STATUS_COMPLETE,
         ];
@@ -737,16 +765,26 @@ class BlockGamePeriodsService extends BaseService
      */
     public static function computeBetSettlementResultNormal(array $result, array $betData, int $openResult, array $rules): array
     {
-        // 判断输赢
-        if ($betData['bet_area'] == $openResult) {
-            $result['settlement_amount'] = round($betData['bet_amount'] * $rules['loss_ratio']); // 结算金额
-            $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
-            $result['win_lose_amount'] = $result['settlement_amount'] - $betData['bet_amount']; // 输赢金额
-            $result['sxfee_amount'] = $betData['bet_amount'] - $result['win_lose_amount']; // 手续费
-            $result['sxfee_ratio'] = 2 - $rules['loss_ratio']; // 手续费率
-        } else {
-            $result['win_lose_amount'] = -$betData['bet_amount']; // 输赢金额
-            $result['is_win'] = EnumType::BET_IS_WIN_NO; // 输赢状态
+        $currFun = function ($bonus = '') use (&$result, $betData, $openResult, $rules) {
+            // 判断输赢
+            if ($betData['bet_area'] == $openResult) {
+                $result['settlement_amount'.$bonus] = round($betData['bet_amount'.$bonus] * $rules['loss_ratio']); // 结算金额
+                $result['win_lose_amount'.$bonus] = $result['settlement_amount'.$bonus] - $betData['bet_amount'.$bonus]; // 输赢金额
+                $result['sxfee_amount'.$bonus] = $betData['bet_amount'.$bonus] - $result['win_lose_amount'.$bonus]; // 手续费
+                $result['sxfee_ratio'] = 2 - $rules['loss_ratio']; // 手续费率
+                $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
+            } else {
+                $result['win_lose_amount'.$bonus] = -$betData['bet_amount'.$bonus]; // 输赢金额
+                $result['is_win'] = EnumType::BET_IS_WIN_NO; // 输赢状态
+            }
+        };
+        // cash
+        if ($betData['bet_amount'] > 0) {
+            $currFun();
+        }
+        // bonus
+        if ($betData['bet_amount_bonus'] > 0) {
+            $currFun('_bonus');
         }
 
         return $result;
@@ -763,45 +801,55 @@ class BlockGamePeriodsService extends BaseService
      */
     public static function computeBetSettlementResultHashNN(array $result, array $betData, int $openResult, array $rules, array $openData): array
     {
-        if ($openResult == 3) { // 和
-            // 计算结算金额
-            $sxFee = round($betData['bet_amount'] * $rules['sxfee_refund_ratio']); // 退还手续费
-            $result['refund_amount'] = $result['settlement_amount'] = $betData['bet_amount'] - $sxFee; // 退还和结算金额
-            $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
-            $result['sxfee_amount'] = $sxFee; // 手续费
-            $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
-            $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
-            $result['status'] = EnumType::BET_STATUS_REFUND;
-
-        } elseif ($openResult == 2) { // 闲赢
-            $pointsNum = $openData[1] ?? 0;
-            if (!$pointsNum) {
-                return $result;
+        $currFun = function ($bonus = '') use (&$result, $betData, $openResult, $rules, $openData) {
+            if ($openResult == 3) { // 和
+                // 计算结算金额
+                $sxFee = round($betData['bet_amount'.$bonus] * $rules['sxfee_refund_ratio']); // 退还手续费
+                $result['refund_amount'.$bonus] = $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] - $sxFee; // 退还和结算金额
+                $result['sxfee_amount'.$bonus] = $sxFee; // 手续费
+                $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
+                $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
+                $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
+                $result['status'] = EnumType::BET_STATUS_REFUND;
+            } elseif ($openResult == 2) { // 闲赢
+                $pointsNum = $openData[1] ?? 0;
+                if (!$pointsNum) {
+                    return $result;
+                }
+                $betAmountPart = $betData['bet_amount'.$bonus] / 10; // 十分之一金额
+                // 输赢赔率，牛9-10需扣除手续费
+                $lossRatio = $pointsNum >= 9 ? $rules['nn_loss_ratio'] : $rules['loss_ratio'];
+                // 计算输赢金额
+                $winAmountTmp = $betAmountPart * $pointsNum;
+                $winAmount = round($winAmountTmp * ($lossRatio - 1));
+                $result['sxfee_amount'.$bonus] = $winAmountTmp - $winAmount; // 手续费
+                $result['sxfee_ratio'] = 2 - $lossRatio; // 手续费率
+                $result['win_lose_ratio'] = $lossRatio; // 输赢赔率
+                $result['win_lose_amount'.$bonus] = $winAmount; // 输赢金额
+                $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] + $winAmount; // 结算金额
+                $result['is_win'] = EnumType::BET_IS_WIN_YES;
+            } elseif ($openResult == 1) { // 庄赢
+                $pointsNum = $openData[0] ?? 0;
+                if (!$pointsNum) {
+                    return $result;
+                }
+                $betAmountPart = $betData['bet_amount'.$bonus] / 10; // 十分之一金额
+                // 输赢金额
+                $winAmount = round($betAmountPart * $pointsNum);
+                $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
+                $result['win_lose_amount'.$bonus] = -$winAmount; // 输赢金额
+                $result['refund_amount'.$bonus] = $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] - $winAmount; // 退还和结算金额
+                $result['is_win'] = EnumType::BET_IS_WIN_NO;
             }
-            $betAmountPart = $betData['bet_amount'] / 10; // 十分之一金额
-            // 输赢赔率，牛9-10需扣除手续费
-            $lossRatio = $pointsNum >= 9 ? $rules['nn_loss_ratio'] : $rules['loss_ratio'];
-            // 计算输赢金额
-            $winAmount = round($betAmountPart * $pointsNum * ($lossRatio - 1));
-            $result['sxfee_amount'] = $betData['bet_amount'] - $winAmount; // 手续费
-            $result['sxfee_ratio'] = 2 - $lossRatio; // 手续费率
-            $result['win_lose_ratio'] = $lossRatio; // 输赢赔率
-            $result['win_lose_amount'] = $winAmount; // 输赢金额
-            $result['settlement_amount'] = $betData['bet_amount'] + $winAmount; // 结算金额
-            $result['is_win'] = EnumType::BET_IS_WIN_YES;
+        };
 
-        } elseif ($openResult == 1) { // 庄赢
-            $pointsNum = $openData[0] ?? 0;
-            if (!$pointsNum) {
-                return $result;
-            }
-            $betAmountPart = $betData['bet_amount'] / 10; // 十分之一金额
-            // 输赢金额
-            $winAmount = round($betAmountPart * $pointsNum);
-            $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
-            $result['win_lose_amount'] = -$winAmount; // 输赢金额
-            $result['refund_amount'] = $result['settlement_amount'] = $betData['bet_amount'] - $winAmount; // 退还和结算金额
-            $result['is_win'] = EnumType::BET_IS_WIN_NO;
+        // cash
+        if ($betData['bet_amount'] > 0) {
+            $currFun();
+        }
+        // bonus
+        if ($betData['bet_amount_bonus'] > 0) {
+            $currFun('_bonus');
         }
 
         return $result;
@@ -817,28 +865,38 @@ class BlockGamePeriodsService extends BaseService
      */
     public static function computeBetSettlementResultHashZX(array $result, array $betData, int $openResult, array $rules): array
     {
-        // 是否压中
-        if ($openResult == $betData['bet_area']) { // 压中
-            $lossRatio = $openResult == 3 ? $rules['zx_equal_loss_ratio'] : $rules['loss_ratio'];
-            // 计算结算金额
-            $result['settlement_amount'] = round($betData['bet_amount'] * $lossRatio); // 结算金额
-            $result['win_lose_ratio'] = $lossRatio; // 输赢赔率
-            $result['win_lose_amount'] = $result['settlement_amount'] - $betData['bet_amount']; // 输赢金额
-        } else { // 未压中
-            // 和，扣除手续费后退还
-            if ($openResult == 3) {
+        $currFun = function ($bonus = '') use (&$result, $betData, $openResult, $rules) {
+            // 是否压中
+            if ($openResult == $betData['bet_area']) { // 压中
+                $lossRatio = $openResult == 3 ? $rules['zx_equal_loss_ratio'] : $rules['loss_ratio'];
                 // 计算结算金额
-                $sxFee = round($betData['bet_amount'] * $rules['sxfee_refund_ratio']); // 退还手续费
-                $result['refund_amount'] = $result['settlement_amount'] = $betData['bet_amount'] - $sxFee; // 退还和结算金额
-                $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
-                $result['sxfee_amount'] = $sxFee; // 手续费
-                $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
-                $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
-                $result['status'] = EnumType::BET_STATUS_REFUND;
-            } else {
-                $result['win_lose_ratio'] = -$betData['bet_amount'];
-                $result['is_win'] = EnumType::BET_IS_WIN_NO;
+                $result['settlement_amount'.$bonus] = round($betData['bet_amount'.$bonus] * $lossRatio); // 结算金额
+                $result['win_lose_ratio'] = $lossRatio; // 输赢赔率
+                $result['win_lose_amount'.$bonus] = $result['settlement_amount'.$bonus] - $betData['bet_amount'.$bonus]; // 输赢金额
+            } else { // 未压中
+                // 和，扣除手续费后退还
+                if ($openResult == 3) {
+                    // 计算结算金额
+                    $sxFee = round($betData['bet_amount'.$bonus] * $rules['sxfee_refund_ratio']); // 退还手续费
+                    $result['refund_amount'.$bonus] = $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] - $sxFee; // 退还和结算金额
+                    $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
+                    $result['sxfee_amount'.$bonus] = $sxFee; // 手续费
+                    $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
+                    $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
+                    $result['status'] = EnumType::BET_STATUS_REFUND;
+                } else {
+                    $result['win_lose_amount'.$bonus] = $rules['bet_amount'.$bonus]; // 输赢赔率
+                    $result['is_win'] = EnumType::BET_IS_WIN_NO;
+                }
             }
+        };
+        // cash
+        if ($betData['bet_amount'] > 0) {
+            $currFun();
+        }
+        // bonus
+        if ($betData['bet_amount_bonus'] > 0) {
+            $currFun('_bonus');
         }
 
         return $result;
@@ -854,16 +912,26 @@ class BlockGamePeriodsService extends BaseService
      */
     public static function computeBetSettlementResultHashXY(array $result, array $betData, int $openResult, array $rules): array
     {
-        // 判断输赢
-        if ($openResult == 1) {
-            $result['settlement_amount'] = round($betData['bet_amount'] * $rules['loss_ratio']); // 结算金额
-            $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
-            $result['win_lose_amount'] = $result['settlement_amount'] - $betData['bet_amount']; // 输赢金额
-            $result['sxfee_amount'] = $betData['bet_amount'] - $result['win_lose_amount']; // 手续费
-            $result['sxfee_ratio'] = 2 - $rules['loss_ratio']; // 手续费率
-        } else {
-            $result['win_lose_amount'] = -$betData['bet_amount']; // 输赢金额
-            $result['is_win'] = EnumType::BET_IS_WIN_NO; // 输赢状态
+        $currFun = function ($bonus = '') use (&$result, $betData, $openResult, $rules) {
+            // 判断输赢
+            if ($openResult == 1) {
+                $result['settlement_amount'.$bonus] = round($betData['bet_amount'.$bonus] * $rules['loss_ratio']); // 结算金额
+                $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
+                $result['win_lose_amount'.$bonus] = $result['settlement_amount'.$bonus] - $betData['bet_amount'.$bonus]; // 输赢金额
+                $result['sxfee_amount'.$bonus] = $betData['bet_amount'.$bonus] - $result['win_lose_amount'.$bonus]; // 手续费
+                $result['sxfee_ratio'] = 2 - $rules['loss_ratio']; // 手续费率
+            } else {
+                $result['win_lose_amount'.$bonus] = -$betData['bet_amount'.$bonus]; // 输赢金额
+                $result['is_win'] = EnumType::BET_IS_WIN_NO; // 输赢状态
+            }
+        };
+        // cash
+        if ($betData['bet_amount'] > 0) {
+            $currFun();
+        }
+        // bonus
+        if ($betData['bet_amount_bonus'] > 0) {
+            $currFun('_bonus');
         }
 
         return $result;

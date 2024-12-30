@@ -151,9 +151,9 @@ class BlockGameBetService extends BaseService
     {
         // 从缓存获取
         $cacheKey = EnumType::BET_USER_INFO_PREFIX.$uid;
-        if ($cached) {
-            $info = self::getCache($cacheKey);
-        } else {
+        $info = self::getCache($cacheKey);
+        if (!$cached || !$info) {
+            // 从数据库获取
             $info = self::getPoolTb('userinfo')->where('uid', $uid)
                 ->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
             if ($info) {
@@ -218,7 +218,8 @@ class BlockGameBetService extends BaseService
             $bd['bet_currency'] = $v['bet_currency']; // 下注币种：1（金币）、2（USDT）、3（TRX）
             $bd['bet_level'] = $v['bet_level']; // 下注等级：1（初级场）、2（中级场）、3（高级场）
             $bd['bet_area'] = $v['bet_area']; // 下注区域：1（左）、2（右）、3（中）
-            $bd['bet_amount'] = $v['bet_amount']; // 下注金额
+            $bd['bet_amount'] = $v['bet_amount']; // 下注金额-cash
+            $bd['bet_amount_bonus'] = $v['bet_amount_bonus'] ?? 0; // 下注金额-bonus
             $bd['game_id'] = $game['game_id']; // 游戏ID
             $bd['game_name'] = $game['game_name'] ?? ''; // 游戏名称;
             $bd['network'] = $game['network'] ?? ''; // 游戏网络;
@@ -238,8 +239,14 @@ class BlockGameBetService extends BaseService
             try {
                 // 数据缓存
                 self::setCache($cacheKey, $bd);
-                // 扣除用户余额
-                User::userEditCoin($bd['uid'], -$bd['bet_amount'], 1, "订单[{$bd['bet_id']}]下注");
+                // 更新用户余额
+                $updateData = [
+                    'coin_change' => -$bd['bet_amount'],
+                    'reason' => 1,
+                    'content' => "hash游戏订单[{$bd['bet_id']}]下注",
+                ];
+                if ($bd['bet_amount_bonus'] > 0) $updateData['bonus_change'] = -$bd['bet_amount_bonus'];
+                UserService::updateUserBalance($bd['uid'], $updateData);
             } catch (\Exception $e) {
                 self::delCache($cacheKey);
                 self::logger()->alert('BlockGameBetService.cacheGameBet：' . $e->getMessage());
@@ -273,6 +280,9 @@ class BlockGameBetService extends BaseService
         if (!$game) {
             throw new ErrMsgException('Error code 3003', 3003);
         }
+        // 获取用户余额
+        $uInfo = UserService::getUserBalance($params['uid']);
+        $balanceCheck = $uInfo['balance'] ?? 0; // 用于检测的余额
 
         // 检测下注数据
         $betData = $betLevelArea = [];
@@ -320,15 +330,40 @@ class BlockGameBetService extends BaseService
 
             $v['rule'] = $rule;
 
+            // 余额下注，检测用户余额
+            if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) {
+                if ($balanceCheck < $v['bet_amount']) {
+                    throw new ErrMsgException('Error code 3008', 3008);
+                }
+                $balanceCheck -= $v['bet_amount']; // 检测余额扣除
+                if ($uInfo['with_bonus']) {
+                    // 划分下注金额，cash和bonus
+                    if ($v['bet_amount'] <= $uInfo['coin']) { // cash足够
+                        $v['bet_amount_bonus'] = 0;
+                        // 检测cash扣除
+                        $uInfo['coin'] -= $v['bet_amount'];
+                    } else { // cash不足
+                        $v['bet_amount_bonus'] = $v['bet_amount']- $uInfo['coin'];
+                        $v['bet_amount'] = $uInfo['coin'];
+                        // 检测cash扣除
+                        $uInfo['coin'] = 0;
+                        $uInfo['bonus'] -= $v['bet_amount_bonus'];
+                    }
+                }
+            } else {
+                $v['bet_amount_bonus'] = 0;
+            }
+
             // 合并相同等级和区域的下注数据
             $betDataTmpKey = $v['bet_level'] . $v['bet_area'] . $v['bet_currency'];
             if (isset($betData[$betDataTmpKey])) {
                 $betData[$betDataTmpKey]['bet_amount'] += $v['bet_amount'];
+                $betData[$betDataTmpKey]['bet_amount_bonus'] += $v['bet_amount_bonus'];
             } else {
                 $betData[$betDataTmpKey] = $v;
             }
             // 不同下注等级所对应的下注区域，用于检测是否存在对立区域下注
-                $betLevelArea[$v['bet_level']][] = $v['bet_area'];
+            $betLevelArea[$v['bet_level']][] = $v['bet_area'];
         }
 
         // 检测是否存在对立区域下注
@@ -340,14 +375,6 @@ class BlockGameBetService extends BaseService
             $baTmp = array_unique($ba);
             if (count($baTmp) == 2 && self::checkBetAreaIsOpposite($game['game_type_second'], $baTmp)) {
                 throw new ErrMsgException('Error code 3014', 3014);
-            }
-        }
-
-        // 余额下注，检测用户余额
-        $uInfo = self::getBetUserInfo($params['uid']);
-        if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) {
-            if ($uInfo && $uInfo['coin'] < array_sum(array_column($params['bet_data'], 'bet_amount'))) {
-                throw new ErrMsgException('Error code 3008', 3008);
             }
         }
 
@@ -395,7 +422,12 @@ class BlockGameBetService extends BaseService
             // 需要追加下注的订单
             $index = $bd['bet_level'].$bd['bet_area'];
             if (isset($betDataList[$index])) {
-                $bd['bet_amount'] += $betDataList[$index]['bet_amount'];
+                if ($betDataList[$index]['bet_amount'] > 0) {
+                    $bd['bet_amount'] += $betDataList[$index]['bet_amount'];
+                }
+                if ($betDataList[$index]['bet_amount_bonus'] > 0) {
+                    $bd['bet_amount_bonus'] += $betDataList[$index]['bet_amount_bonus'];
+                }
                 $addBetList[$key] = $bd;
                 // 删除已标记为追加下注的数据，剩下的则为非追加下注数据
                 unset($betDataList[$index]);
@@ -499,7 +531,6 @@ class BlockGameBetService extends BaseService
      */
     public static function saveBetData(array $data): void
     {
-        self::logger()->alert('slotsLogAdd1:' . var_export($data, true));
         self::getPartTb(self::$tbName)->insert($data);
 
         // 添加slots游戏日志
@@ -533,13 +564,13 @@ class BlockGameBetService extends BaseService
                     'game_id' => $d['slots_game_id'],
                     'englishname' => $d['game_name'] ?? '',
                     'cashBetAmount' => $d['bet_amount'],
-                    'bonusBetAmount' => 0,
+                    'bonusBetAmount' => $d['bet_amount_bonus'],
                     'cashWinAmount' => $d['settlement_amount'],
-                    'bonusWinAmount' => 0,
+                    'bonusWinAmount' => $d['settlement_amount_bonus'],
                     'cashTransferAmount' => $d['win_lose_amount'],
-                    'bonusTransferAmount' => 0,
+                    'bonusTransferAmount' => $d['win_lose_amount_bonus'],
                     'cashRefundAmount' => $d['refund_amount'] ?? 0,
-                    'bonusRefundAmount' => 0,
+                    'bonusRefundAmount' => $d['refund_amount_bonus'] ?? 0,
                     'transaction_id' => '',
                     'betTime' => strtotime($d['start_time']),
                     'package_id' => $d['package_id'],

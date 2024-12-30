@@ -231,13 +231,18 @@ class SqlController
                       `block_hash` varchar(100) CHARACTER SET utf32 NOT NULL DEFAULT '' COMMENT '开奖区块hash',
                       `transaction_hash` varchar(100) NOT NULL DEFAULT '' COMMENT '开奖交易hash',
                       `bet_area` tinyint(1) NOT NULL COMMENT '下注区域：1（左）、2（右）、3（中）',
-                      `bet_amount` int(15) NOT NULL DEFAULT '0' COMMENT '下注金额',
+                      `bet_amount` int(15) NOT NULL DEFAULT '0' COMMENT '下注金额-cash',
+                      `bet_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '下注金额-bonus',
                       `bet_currency` tinyint(1) NOT NULL DEFAULT '1' COMMENT '下注币种：1（金币）、2（USDT）、3（TRX）',
                       `is_win` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否中奖：0（和）、1（赢）、2（输）',
-                      `win_lose_amount` int(15) NOT NULL DEFAULT '0' COMMENT '输赢金额',
-                      `refund_amount` int(15) NOT NULL DEFAULT '0' COMMENT '退还金额',
-                      `sxfee_amount` int(15) NOT NULL DEFAULT '0' COMMENT '手续费',
-                      `settlement_amount` int(15) NOT NULL DEFAULT '0' COMMENT '结算金额',
+                      `win_lose_amount` int(15) NOT NULL DEFAULT '0' COMMENT '输赢金额-cash',
+                      `win_lose_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '输赢金额-bonus',
+                      `refund_amount` int(15) NOT NULL DEFAULT '0' COMMENT '退还金额-cash',
+                      `refund_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '退还金额-bonus',
+                      `sxfee_amount` int(15) NOT NULL DEFAULT '0' COMMENT '手续费-cash',
+                      `sxfee_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '手续费-bonus',
+                      `settlement_amount` int(15) NOT NULL DEFAULT '0' COMMENT '结算金额-cash',
+                      `settlement_amount_bonus` int(15) NOT NULL COMMENT '结算金额-bonus',
                       `win_lose_ratio` float(3,2) NOT NULL DEFAULT '0.00' COMMENT '输赢赔付率',
                       `sxfee_ratio` float(4,3) NOT NULL DEFAULT '0.000' COMMENT '手续费率',
                       `status` tinyint(1) NOT NULL COMMENT '状态：0（待结算）、1（已完成）、2（已退款）',
@@ -246,12 +251,12 @@ class SqlController
                       `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
                       `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '更新时间',
                       PRIMARY KEY (`bet_id`) USING BTREE,
-                      KEY `index_game_id` (`game_id`),
+                      KEY `index_game_id` (`game_id`) USING BTREE,
                       KEY `index_curr_periods` (`curr_periods`) USING BTREE,
                       KEY `index_open_block` (`open_block`) USING BTREE,
                       KEY `index_channel` (`channel`) USING BTREE,
                       KEY `index_package_id` (`package_id`) USING BTREE
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏下注记录表'";
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏下注记录表';";
 
             Db::select($sql);
         }

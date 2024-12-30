@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Common\Common;
 use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
+use App\Service\WebSocket\SysConfService;
 use Carbon\Carbon;
 use Hyperf\DbConnection\Db;
 use MrBrownNL\RandomNicknameGenerator\RandomNicknameGenerator;
@@ -45,8 +46,18 @@ class UserService extends BaseService
     {
         $sqlArr = [];
         foreach ($data as $v) {
-            $sqlArr[] = "UPDATE br_userinfo SET coin = coin + {$v['coin_change']} WHERE uid = {$v['uid']}";
+            $setField = '';
+            if ($v['coin_change'] > 0) {
+                $setField .= "coin = coin + {$v['coin_change']}";
+            }
+            if ($v['bonus_change'] > 0) {
+                $setField .= ",bonus = bonus + {$v['bonus_change']}";
+            }
+            if ($setField != '') {
+                $sqlArr[] = "UPDATE br_userinfo SET {$setField} WHERE uid = {$v['uid']}";
+            }
         }
+
         if ($sqlArr) {
             Db::update(implode(';', $sqlArr));
         }
@@ -69,12 +80,58 @@ class UserService extends BaseService
     }
 
     /**
+     * 获取用户余额
      * @param int $uid
      * @return mixed
      */
     public static function getUserBalance(int $uid): mixed
     {
-        return self::getPoolTb(self::$tbName)->where('uid', $uid)->first(['uid', 'coin', 'bonus']);
+        // 获取配置
+        $conf = SysConfService::getHashGameConf();
+        $info = self::getPoolTb(self::$tbName)->where('uid', $uid)->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
+        if (isset($conf['hash_game_bet_with_bouns']) && $conf['hash_game_bet_with_bouns']) {
+            $info['balance'] = $info['coin'] + $info['bonus'];
+            $info['with_bonus'] = 1;
+        } else {
+            $info['balance'] = $info['coin'];
+            $info['with_bonus'] = 0;
+        }
+        return $info;
+    }
+
+    /**
+     * 获取下注用户信息
+     * @param $uid
+     * @param bool $cached
+     * @return array
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function getBetUserInfo($uid, bool $cached = false): array
+    {
+        // 从缓存获取
+        $cacheKey = EnumType::BET_USER_INFO_PREFIX.$uid;
+        $info = self::getCache($cacheKey);
+        if (!$cached || !$info) {
+            // 从数据库获取
+            $info = self::getPoolTb('userinfo')->where('uid', $uid)
+                ->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
+
+            if ($info) {
+                // 获取配置
+                $conf = SysConfService::getHashGameConf();
+                if (isset($conf['hash_game_bet_with_bouns']) && $conf['hash_game_bet_with_bouns']) {
+                    $info['balance'] = $info['coin'] + $info['bonus'];
+                } else {
+                    $info['balance'] = $info['coin'];
+                }
+                // 数据缓存
+                self::setCache($cacheKey, $info, self::$cacheExpire);
+            }
+        }
+
+        return $info;
     }
 
     /**
@@ -154,5 +211,54 @@ class UserService extends BaseService
         Db::select("TRUNCATE TABLE br_user_bet_ranking");
         // 插入数据
         BaseService::getPoolTb('user_bet_ranking')->insert($rankingData);
+    }
+
+    /**
+     * 更新用户余额
+     * @param $uid
+     * @param array $params
+     * @return void
+     */
+    public static function updateUserBalance($uid, array $params): void
+    {
+        // 用户信息
+        $user = self::getPoolTb(self::$tbName)
+            ->select('uid', 'coin', 'bonus', 'package_id', 'channel', 'withdraw_money', 'withdraw_money_other')
+            ->where('uid', $uid)->first();
+
+        $updateData = [];
+        if (isset($params['coin_change']) && $params['coin_change'] != 0) {
+            // 添加日志
+            self::getPartTb('coin')->insert([
+                'uid' => $user['uid'],
+                'num' => $params['coin_change'],
+                'total' => bcadd((string)$user['coin'], (string)$params['coin_change'],0),
+                'reason' => $params['reason'] ?? 1,
+                'type' => $params['coin_change'] > 0 ? 1 : 0,
+                'content' => $params['content'] ?? '',
+                'channel' => $user['channel'],
+                'package_id' => $user['package_id'],
+                'createtime' => time(),
+            ]);
+            $updateData['coin'] = Db::raw('coin + ' . $params['coin_change']);
+        }
+        if (isset($params['bonus_change']) && $params['bonus_change'] != 0) {
+            // 添加日志
+            self::getPartTb('bonus')->insert([
+                'uid' => $user['uid'],
+                'num' => $params['bonus_change'],
+                'total' => bcadd((string)$user['bonus'], (string)$params['bonus_change'],0),
+                'reason' => $params['reason'] ?? 1,
+                'type' => $params['bonus_change'] > 0 ? 1 : 0,
+                'content' => $params['content'] ?? '',
+                'channel' => $user['channel'],
+                'package_id' => $user['package_id'],
+                'createtime' => time(),
+            ]);
+            $updateData['bonus'] = Db::raw('bonus + ' . $params['bonus_change']);
+        }
+
+        // 更新余额
+        self::getPoolTb(self::$tbName)->where('uid', $uid)->update($updateData);
     }
 }

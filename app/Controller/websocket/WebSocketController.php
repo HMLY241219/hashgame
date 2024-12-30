@@ -82,14 +82,14 @@ class WebSocketController implements OnMessageInterface, OnOpenInterface, OnClos
     {
         echo("FD {$fd} closed" . PHP_EOL);
         // 清除客户端ID缓存
-        WSSocketService::delClientFdCache($fd);
+//        WSSocketService::delClientFdCache($fd);
     }
 
     public function onOpen($server, $request): void
     {
         $response = (new Response($server))->init($request);
         // 客户端ID缓存
-        WSSocketService::cacheClientFd($request->fd);
+//        WSSocketService::cacheClientFd($request->fd);
         // 发送链接成功消息
         $buffer = new HandShake();
         $buffer->setOpenData('HandShake Success');
