@@ -51,7 +51,8 @@ class UserService extends BaseService
                 $setField .= "coin = coin + {$v['coin_change']}";
             }
             if ($v['bonus_change'] > 0) {
-                $setField .= ",bonus = bonus + {$v['bonus_change']}";
+                $setField .= !empty($setField) ? ',' : '';
+                $setField .= "bonus = bonus + {$v['bonus_change']}";
             }
             if ($setField != '') {
                 $sqlArr[] = "UPDATE br_userinfo SET {$setField} WHERE uid = {$v['uid']}";

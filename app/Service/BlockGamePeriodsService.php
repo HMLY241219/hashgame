@@ -267,9 +267,9 @@ class BlockGamePeriodsService extends BaseService
         }
 
         // 没有结算下注数据
-        if (!$betDataList) {
-            self::logger()->alert('BlockGamePeriodsService.periodsSettlement：No bet data, block number ' . $currOpenBlockNumber);
-        }
+//        if (!$betDataList) {
+//            self::logger()->alert('BlockGamePeriodsService.periodsSettlement：No bet data, block number ' . $currOpenBlockNumber);
+//        }
 
         // 组装用户余额变更日志记录
         $userCoinLogs = $userBonusLogs = [];
