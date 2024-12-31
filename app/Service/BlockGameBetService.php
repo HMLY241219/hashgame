@@ -139,33 +139,6 @@ class BlockGameBetService extends BaseService
     }
 
     /**
-     * 获取下注用户信息
-     * @param $uid
-     * @param bool $cached
-     * @return array
-     * @throws \Psr\Container\ContainerExceptionInterface
-     * @throws \Psr\Container\NotFoundExceptionInterface
-     * @throws \RedisException
-     */
-    public static function getBetUserInfo($uid, bool $cached = false): array
-    {
-        // 从缓存获取
-        $cacheKey = EnumType::BET_USER_INFO_PREFIX.$uid;
-        $info = self::getCache($cacheKey);
-        if (!$cached || !$info) {
-            // 从数据库获取
-            $info = self::getPoolTb('userinfo')->where('uid', $uid)
-                ->first(['uid', 'channel', 'puid', 'package_id', 'coin', 'bonus']);
-            if ($info) {
-                // 数据缓存
-                self::setCache($cacheKey, $info, self::$cacheExpire);
-            }
-        }
-
-        return $info;
-    }
-
-    /**
      * 缓存下注数据
      * @param array $params
      * @return array
@@ -727,7 +700,7 @@ class BlockGameBetService extends BaseService
             ->where('bet_way', $params['bet_way'])
             ->where('bet_level', $params['bet_level'])
             ->where('bet_area', $params['bet_area'])
-            ->sum('bet_amount');
+            ->sum(Db::raw('bet_amount + bet_amount_bonus'));
     }
 
     /**
@@ -828,12 +801,13 @@ class BlockGameBetService extends BaseService
             if ($betData['bet_level'] != $betLevel) continue;
             // 当前用户最近一期下注金额
             $index = $betData['bet_area']-1;
+            $betAmount = $betData['bet_amount'] + $betData['bet_amount_bonus'];
             if ($betData['uid'] == $uid && $betData['open_block'] == $lastBlockNumber+1) {
-                $statisticsData['player_bet_amount'][$index] += $betData['bet_amount'];
+                $statisticsData['player_bet_amount'][$index] += $betAmount;
             }
 
             // 下注金额在数据库查询数据上累加
-            $statisticsData['bet_amount'][$index] += $betData['bet_amount'];
+            $statisticsData['bet_amount'][$index] += $betAmount;
 
             // 用户下注数累加
             if (isset($userBetNumList[$index][$betData['uid']])) {
@@ -892,10 +866,11 @@ class BlockGameBetService extends BaseService
             // 当期下注人数
             $statisticsData['user_num'][$index] += 1;
             // 当期下注金额
-            $statisticsData['bet_amount'][$index] += $betData['bet_amount'];
+            $betAmount = $betData['bet_amount'] + $betData['bet_amount_bonus'];
+            $statisticsData['bet_amount'][$index] += $betAmount;
             // 当前用户当期下注金额
             if ($uid && $betData['uid'] == $uid) {
-                $statisticsData['player_bet_amount'][$index] += $betData['bet_amount'];
+                $statisticsData['player_bet_amount'][$index] += $betAmount;
             }
         }
 
