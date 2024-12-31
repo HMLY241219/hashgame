@@ -139,7 +139,7 @@ class BlockGamePeriodsService extends BaseService
     public static function periodsSettlement3S(array $params): array
     {
         // 检测当前期数是否结算
-        $info = self::getPartTb(self::$tbName)->where('curr_periods', $params['periods_no'])->first();
+        $info = self::getPartTb(self::$tbName)->where('curr_periods', $params['periods_no'])->first(['periods_id', 'open_block']);
         if (!$info) {
             $blockNumber = self::periodsSettlement($params['periods_no'], $params['network'], false);
             if ($blockNumber) {
@@ -370,10 +370,16 @@ class BlockGamePeriodsService extends BaseService
                 if ($diffNum > 1) {
                     // 获取未结算到的区块
                     $cacheKey = EnumType::PERIODS_MISS_BLOCK_CACHE . EnumType::NETWORK_TRX;
+                    $queueService = new QueueService();
                     for ($i = 1; $i < $diffNum; $i++) {
                         $field = (string)($lastBlock['block_number'] + $i);
                         // 缓存未计算到的区块号
                         BaseService::setFieldCache($cacheKey, $field, 1);
+                        // 推送到队列
+                        $queueService->push([
+                            'action' => EnumType::QUEUE_ACTION_BLOCK_SETTLEMENT,
+                            'block_number' => $field
+                        ]);
                     }
                 }
             }

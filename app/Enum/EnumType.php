@@ -121,4 +121,7 @@ class EnumType
     /*排行榜*/
     public const RANKING_TYPE_WIN_WEEK = 1; // 周中奖类型
     public const RANKING_TYPE_WIN_MONTH = 2; // 月中奖类型
+
+    /*队列*/
+    public const QUEUE_ACTION_BLOCK_SETTLEMENT = 1; // 区块结算
 }
