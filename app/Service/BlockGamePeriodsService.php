@@ -170,7 +170,7 @@ class BlockGamePeriodsService extends BaseService
         // 添加缓存锁，避免多个进程同时结算相同区块
         $lockKey = EnumType::LOCK_LAST_OPEN_BLOCK .'_'. $network . '_'. $currOpenBlockNumber;
         if (!self::setCacheLock($lockKey, 20)) {
-            self::logger()->alert('BlockGamePeriodsService.periodsSettlement：The current block is already locked, block number ' . $currOpenBlockNumber);
+//            self::logger()->alert('BlockGamePeriodsService.periodsSettlement：The current block is already locked, block number ' . $currOpenBlockNumber);
             return 0;
         }
 
