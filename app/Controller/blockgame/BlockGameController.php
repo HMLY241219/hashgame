@@ -270,6 +270,8 @@ class BlockGameController extends AbstractController{
                 'page' => $params['page'] ?? 0,
                 'page_size' => $params['page_size'] ?? 0,
                 'date' => $params['date'] ?? '',
+                // 查询字段
+                'field' => ['bet_id', 'uid', 'game_id', 'game_name', 'open_block', 'open_result', 'open_data', 'block_hash', 'open_data', '"transaction_hash', 'bet_amount_bonus', 'win_lose_amount', 'win_lose_amount_bonus'],
                 // 排序
                 'order' => 'create_time ' . $sort,
             ], (!empty($params['page']) ? false : true), false);
