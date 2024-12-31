@@ -23,11 +23,12 @@ class QueueService
         switch ($params['action']) {
             // 区块结算
             case EnumType::QUEUE_ACTION_BLOCK_SETTLEMENT:
+                $this->logger->alert('QueueService.BLOCK_SETTLEMENT.$params：' . var_export($params, 1) );
                 $res = BlockGamePeriodsService::periodsSettlement3S([
                     'periods_no' => $params['block_number'] ?? 0,
                     'network' => EnumType::NETWORK_TRX,
                 ]);
-                $this->logger->alert('QueueService.BLOCK_SETTLEMENT：' . var_export($res, 1) );
+                $this->logger->alert('QueueService.BLOCK_SETTLEMENT.$res：' . var_export($res, 1) );
                 break;
         }
     }
