@@ -58,7 +58,9 @@ class RankingStatistics extends HyperfCommand
         $currTime = Carbon::now();
         $currDate = (int)$currTime->format($this->dateFormat);
         $field = ['bet_id', 'bet_way', 'bet_level', 'uid', 'game_id', 'game_name', 'network', 'open_block',
-            'block_hash', 'transaction_hash', 'bet_amount', 'bet_currency', 'is_win', 'win_lose_amount', 'settlement_amount',
+            'block_hash', 'transaction_hash', 'bet_amount', 'bet_currency', 'is_win',
+            Db::raw('(win_lose_amount + win_lose_amount_bonus) as win_lose_amount'),
+            Db::raw('(settlement_amount + settlement_amount_bonus) as settlement_amount'),
             'date', 'create_time', 'update_time'];
         $limitNum = 20; // 每张表查询数据条数
         // 获取所有数据表
