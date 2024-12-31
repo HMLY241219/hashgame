@@ -177,6 +177,9 @@ class BlockGamePeriodsService extends BaseService
         // 获取开奖区块信息
         $openBlockInfo = BlockApiService::getBlockInfo($currOpenBlockNumber, $network);
         if (!$openBlockInfo) {
+            // 解锁，未查询到区块信息说明区块信息还未同步到当前节点，解锁让后续队列来重试
+            self::delCache($lockKey);
+
             self::logger()->alert('BlockGamePeriodsService.periodsSettlement：No block info, block number ' . $currOpenBlockNumber);
             return 0;
         }
@@ -338,9 +341,6 @@ class BlockGamePeriodsService extends BaseService
             });
             // 清除下注缓存数据
             array_map(function ($key) { self::delCache($key); }, $settlementCacheKeys);
-
-            // 解锁
-//            self::delCache($lockKey);
 
             unset($settlementCacheKeys);
             unset($gamePeriodsList);
