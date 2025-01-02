@@ -11,6 +11,7 @@ use Hyperf\Amqp\Annotation\Consumer;
 use Hyperf\Amqp\Message\ConsumerMessage;
 use Hyperf\Di\Annotation\Inject;
 use PhpAmqpLib\Message\AMQPMessage;
+use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
 #[Consumer(exchange: 'block', routingKey: 'settlement', queue: 'block-settlement', name: "BlockSettlementConsumer", nums: 1)]
@@ -18,6 +19,8 @@ class BlockSettlementConsumer extends ConsumerMessage
 {
     #[Inject]
     protected LoggerInterface $logger;
+
+    protected Type|string $type = Type::DIRECT; //Type::FANOUT;
 
     public function consumeMessage($data, AMQPMessage $message): Result
     {

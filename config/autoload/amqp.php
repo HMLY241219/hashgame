@@ -7,9 +7,6 @@ return [
         'user' => env('RABBIT_USER'),
         'password' => env('RABBIT_PASSWORD'),
         'vhost' => '/',
-        'options' => [
-            'delivery_mode' => 2,
-        ],
         'concurrent' => [
             'limit' => 1,
         ],
