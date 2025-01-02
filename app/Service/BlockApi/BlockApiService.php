@@ -62,4 +62,21 @@ class BlockApiService
             EnumType::NETWORK_BSC => BscScanService::getTransactionInfo($tranHash),
         };
     }
+
+    /**
+     * 发送交易
+     * @param string $toAddress
+     * @param float $amount
+     * @param string $currency
+     * @param int $network
+     * @return mixed
+     */
+    public static function sendTransaction(string $toAddress, float $amount, string $currency, int $network = EnumType::NETWORK_TRX): mixed
+    {
+        return match ($network) {
+            EnumType::NETWORK_TRX => TronNodeService::sendTransaction($toAddress, $amount, $currency),
+            EnumType::NETWORK_ETH => [],
+            EnumType::NETWORK_BSC => [],
+        };
+    }
 }

@@ -298,14 +298,17 @@ class BlockGameBetService extends BaseService
             if (empty($betLimit) || count($betLimit) !== 2) {
                 throw new ErrMsgException('Error code 3007', 3007);
             }
-            if ($v['bet_amount'] < $betLimit[0] * self::$amountDecimal || $v['bet_amount'] > $betLimit[1] * self::$amountDecimal) {
-                throw new ErrMsgException('Error code 3004', 3004);
-            }
 
             $v['rule'] = $rule;
 
-            // 余额下注，检测用户余额
+            // 余额下注
             if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) {
+                // 检测限红
+                if ($v['bet_amount'] < $betLimit[0] * self::$amountDecimal || $v['bet_amount'] > $betLimit[1] * self::$amountDecimal) {
+                    throw new ErrMsgException('Error code 3004', 3004);
+                }
+
+                // 检测用户余额
                 if ($balanceCheck < $v['bet_amount']) {
                     throw new ErrMsgException('Error code 3008', 3008);
                 }
@@ -325,6 +328,16 @@ class BlockGameBetService extends BaseService
                     }
                 }
             } else {
+                // 转账下注，检测限红
+                if ($v['bet_amount'] < $betLimit[0] * self::$amountDecimal) {
+                    throw new ErrMsgException('Error code 3004', 3004);
+                } elseif ($v['bet_amount'] > $betLimit[1] * self::$amountDecimal) {
+                    // 扣除手续费后退回用户钱包
+                    $betAmount = round($v['bet_amount'] - $v['bet_amount'] * $rule['sxfee_refund_ratio']) / self::$amountDecimal;
+                    BlockApiService::sendTransaction($v['bet_address'], (float)$betAmount, $v['bet_currency']);
+                    throw new ErrMsgException('Error code 3004', 3004);
+                }
+
                 $v['bet_amount_bonus'] = 0;
             }
 
