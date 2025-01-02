@@ -15,8 +15,6 @@ use App\Service\WebSocket\SysConfService;
  */
 class WebHookService extends BaseService
 {
-    protected static string $apiKey = "hcBHld5d98pSTOnt6eE7";
-
     /**
      * 获取最新区块
      * @return void
@@ -33,7 +31,7 @@ class WebHookService extends BaseService
 
         // 检测是否是激活钱包
         $conf = SysConfService::getHashGameConf();
-        if ($check['amount'] == $conf['active_transfer_amount']) {
+        if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == $conf['active_transfer_currency']) {
             // 获取交易信息
             $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
             if (!$transactionInfo) {
@@ -144,7 +142,7 @@ class WebHookService extends BaseService
         }
 
         return [
-            'symbol' => isset($params['tokenSymbol']) ? EnumType::TOKEN_SYMBOL_USDT: EnumType::TOKEN_SYMBOL_TRX, // 货币符号单位
+            'symbol' => strtolower(isset($params['tokenSymbol']) ? EnumType::TOKEN_SYMBOL_USDT: EnumType::TOKEN_SYMBOL_TRX), // 货币符号单位
             'amount' => $params['tokenValue'] ?? $params['value'], // 充值金额
         ];
     }
