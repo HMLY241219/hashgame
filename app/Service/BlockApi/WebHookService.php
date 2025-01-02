@@ -94,6 +94,7 @@ class WebHookService extends BaseService
                     'bet_area' => $betArea,
                     'bet_currency' => self::getBetCurrencyByChar($check['symbol']),
                     'bet_amount' => $check['amount'] * self::$amountDecimal,
+                    'bet_address' => $transactionInfo['from_address'],
                 ]
             ],
         ]);

@@ -16,7 +16,7 @@
         "ext-bcmath": "*",
         "ext-curl": "*",
         "google/protobuf": "v3.25.5",
-        "hyperf/async-queue": "^3.1",
+        "hyperf/amqp": "^3.1",
         "hyperf/cache": "~3.1.0",
         "hyperf/command": "~3.1.0",
         "hyperf/config": "~3.1.0",

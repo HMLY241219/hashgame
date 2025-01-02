@@ -234,6 +234,7 @@ class SqlController
                       `bet_amount` int(15) NOT NULL DEFAULT '0' COMMENT '下注金额-cash',
                       `bet_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '下注金额-bonus',
                       `bet_currency` tinyint(1) NOT NULL DEFAULT '1' COMMENT '下注币种：1（金币）、2（USDT）、3（TRX）',
+                      `bet_address` varchar(100) DEFAULT NULL COMMENT '转账下注钱包地址',
                       `is_win` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否中奖：0（和）、1（赢）、2（输）',
                       `win_lose_amount` int(15) NOT NULL DEFAULT '0' COMMENT '输赢金额-cash',
                       `win_lose_amount_bonus` int(15) NOT NULL DEFAULT '0' COMMENT '输赢金额-bonus',

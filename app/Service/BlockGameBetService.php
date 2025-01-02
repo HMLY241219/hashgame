@@ -193,6 +193,7 @@ class BlockGameBetService extends BaseService
             $bd['bet_area'] = $v['bet_area']; // 下注区域：1（左）、2（右）、3（中）
             $bd['bet_amount'] = $v['bet_amount']; // 下注金额-cash
             $bd['bet_amount_bonus'] = $v['bet_amount_bonus'] ?? 0; // 下注金额-bonus
+            $bd['bet_address'] = $v['bet_address'] ?? ''; // 转账下注钱包地址
             $bd['game_id'] = $game['game_id']; // 游戏ID
             $bd['game_name'] = $game['game_name'] ?? ''; // 游戏名称;
             $bd['network'] = $game['network'] ?? ''; // 游戏网络;

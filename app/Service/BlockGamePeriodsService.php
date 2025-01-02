@@ -2,9 +2,13 @@
 
 namespace App\Service;
 
+use App\Amqp\Producer\BlockSettlementProducer;
+use App\Amqp\Producer\BlockTransferProducer;
 use App\Common\Common;
 use App\Enum\EnumType;
 use App\Service\BlockApi\BlockApiService;
+use Hyperf\Amqp\Producer;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\DbConnection\Db;
 use function Hyperf\Coroutine\go;
 
@@ -192,7 +196,7 @@ class BlockGamePeriodsService extends BaseService
         // 游戏期数数据
         list($gamePeriodsList, $gameRuleList) = self::packagePeriodsData($openBlockInfo, $network);
         // 获取当前区块待结算的下注
-        $betUsers = $betDataList = $settlementCacheKeys = $userCoinChange = [];
+        $betUsers = $betDataList = $settlementCacheKeys = $userCoinChange = $needTransferBackData = [];
         $cacheKeys = self::getCacheKeys(self::getBetDataCachePrefix([
             'network' => $network,
             'block_number' => $currOpenBlockNumber,
@@ -263,6 +267,15 @@ class BlockGamePeriodsService extends BaseService
                         'bonus_change' => $betData['settlement_amount_bonus'],
                     ];
                 }
+            } elseif ($betData['bet_way'] == EnumType::BET_WAY_TRANSFER) { // 下注方式为转账下注
+                // 是否需要结算回用户钱包地址
+                if ($betData['settlement_amount'] > 0) {
+                    $needTransferBackData[] = [
+                        'amount' => $betData['settlement_amount'] / self::$amountDecimal,
+                        'to_address' => $betData['bet_address'],
+                        'currency' => self::getBetCurrencyByNumber($betData['bet_currency']),
+                    ];
+                }
             }
 
             $betDataList[] = $betData;
@@ -277,44 +290,7 @@ class BlockGamePeriodsService extends BaseService
         // 组装用户余额变更日志记录
         $userCoinLogs = $userBonusLogs = [];
         if ($userCoinChange) {
-            // 获取所有结算用户信息
-            $betUsersTmp = self::getPoolTb('userinfo')->whereIn('uid', array_keys($userCoinChange))
-                ->select('uid', 'coin', 'bonus', 'channel', 'package_id')->get()->toArray();
-            $betUsers = [];
-            foreach ($betUsersTmp as $user) {
-                $betUsers[$user['uid']] = $user;
-            }
-            unset($betUsersTmp);
-            // 组装用户余额变更日志记录
-            $currTime = time();
-            foreach ($betDataList as $bet) {
-                if ($bet['bet_way'] == EnumType::BET_WAY_TRANSFER) continue;
-                $logTmp = [
-                    'uid' => $bet['uid'],
-                    'num' => 0,
-                    'total' => 0,
-                    'reason' => 1,
-                    'type' => 1,
-                    'content' => "hash游戏订单[{$bet['bet_id']}]下注结算",
-                    'channel' => $betUsers[$bet['uid']]['channel'],
-                    'package_id' => $betUsers[$bet['uid']]['package_id'],
-                    'createtime' => $currTime,
-                ];
-                if ($bet['settlement_amount'] > 0) {
-                    // 余额变更日志
-                    $betUsers[$bet['uid']]['coin'] += $bet['settlement_amount']; // 用户余额累加-cash
-                    $logTmp['num'] = $bet['settlement_amount'];
-                    $logTmp['total'] = $betUsers[$bet['uid']]['coin'];
-                    $userCoinLogs[] = $logTmp;
-                }
-                if ($bet['settlement_amount_bonus'] > 0) {
-                    // 余额变更日志
-                    $betUsers[$bet['uid']]['bonus'] += $bet['settlement_amount_bonus']; // 用户余额累加-bonus
-                    $logTmp['num'] = $bet['settlement_amount_bonus'];
-                    $logTmp['total'] = $betUsers[$bet['uid']]['bonus'];
-                    $userBonusLogs[] = $logTmp;
-                }
-            }
+            list($userCoinLogs, $userBonusLogs) = self::packUserBalanceChangeLog($betDataList, array_keys($userCoinChange));
         }
 
         try {
@@ -342,8 +318,16 @@ class BlockGamePeriodsService extends BaseService
             // 清除下注缓存数据
             array_map(function ($key) { self::delCache($key); }, $settlementCacheKeys);
 
-            unset($settlementCacheKeys);
-            unset($gamePeriodsList);
+            // 需要结算回用户钱包地址的数据
+            if ($needTransferBackData) {
+                $producer = ApplicationContext::getContainer()->get(Producer::class); // 注入生产者
+                foreach ($needTransferBackData as $v) {
+                    // MQ生产消息
+                    $producer->produce(new BlockTransferProducer($v));
+                }
+            }
+
+            unset($settlementCacheKeys, $gamePeriodsList, $needTransferBackData);
             return $currOpenBlockNumber;
         } catch (\Exception $e) {
             // 解锁
@@ -351,6 +335,57 @@ class BlockGamePeriodsService extends BaseService
             self::logger()->error('BlockGamePeriodsService.periodsSettlement.Exception：' . $e->getMessage());
             return 0;
         }
+    }
+
+    /**
+     * 组装用户余额变更日志记录
+     * @param array $betDataList
+     * @param array $uids
+     * @return array
+     */
+    protected static function packUserBalanceChangeLog(array $betDataList, array $uids): array
+    {
+        // 获取所有结算用户信息
+        $betUsersTmp = self::getPoolTb('userinfo')->whereIn('uid', $uids)
+            ->select('uid', 'coin', 'bonus', 'channel', 'package_id')->get()->toArray();
+        $betUsers = [];
+        foreach ($betUsersTmp as $user) {
+            $betUsers[$user['uid']] = $user;
+        }
+        unset($betUsersTmp);
+        // 组装用户余额变更日志记录
+        $currTime = time();
+        $userCoinLogs = $userBonusLogs = [];
+        foreach ($betDataList as $bet) {
+            if ($bet['bet_way'] == EnumType::BET_WAY_TRANSFER) continue;
+            $logTmp = [
+                'uid' => $bet['uid'],
+                'num' => 0,
+                'total' => 0,
+                'reason' => 1,
+                'type' => 1,
+                'content' => "hash游戏订单[{$bet['bet_id']}]下注结算",
+                'channel' => $betUsers[$bet['uid']]['channel'],
+                'package_id' => $betUsers[$bet['uid']]['package_id'],
+                'createtime' => $currTime,
+            ];
+            if ($bet['settlement_amount'] > 0) {
+                // 余额变更日志
+                $betUsers[$bet['uid']]['coin'] += $bet['settlement_amount']; // 用户余额累加-cash
+                $logTmp['num'] = $bet['settlement_amount'];
+                $logTmp['total'] = $betUsers[$bet['uid']]['coin'];
+                $userCoinLogs[] = $logTmp;
+            }
+            if ($bet['settlement_amount_bonus'] > 0) {
+                // 余额变更日志
+                $betUsers[$bet['uid']]['bonus'] += $bet['settlement_amount_bonus']; // 用户余额累加-bonus
+                $logTmp['num'] = $bet['settlement_amount_bonus'];
+                $logTmp['total'] = $betUsers[$bet['uid']]['bonus'];
+                $userBonusLogs[] = $logTmp;
+            }
+        }
+
+        return [$userCoinLogs, $userBonusLogs];
     }
 
     /**
@@ -370,16 +405,13 @@ class BlockGamePeriodsService extends BaseService
                 if ($diffNum > 1) {
                     // 获取未结算到的区块
                     $cacheKey = EnumType::PERIODS_MISS_BLOCK_CACHE . EnumType::NETWORK_TRX;
-                    $queueService = new QueueService();
+                    $producer = ApplicationContext::getContainer()->get(Producer::class); // 注入生产者
                     for ($i = 1; $i < $diffNum; $i++) {
                         $field = (string)($lastBlock['block_number'] + $i);
                         // 缓存未计算到的区块号
                         BaseService::setFieldCache($cacheKey, $field, 1);
-                        // 推送到队列
-                        $queueService->push([
-                            'action' => EnumType::QUEUE_ACTION_BLOCK_SETTLEMENT,
-                            'block_number' => $field
-                        ]);
+                        // MQ生产消息
+                        $producer->produce(new BlockSettlementProducer(['block_number' => $field]));
                     }
                 }
             }
