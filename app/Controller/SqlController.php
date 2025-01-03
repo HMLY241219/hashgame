@@ -180,6 +180,7 @@ class SqlController
                  is_sports int(2) NOT NULL DEFAULT 0 COMMENT '是否体育订单:1=是,0=否',
                  is_settlement int(2) NOT NULL DEFAULT 1  COMMENT'是否结算:1=已完成,0=未结算,2=已退还,3=赢的钱已结算(PP需要这个字段，下注,结果和结算是2个不同接口),4=以回滚(订单变为进行中)',
                  really_betAmount int(15) NOT NULL DEFAULT 0 COMMENT '(sbs)体育实际下注金额',
+                 bet_currency tinyint(1) NOT NULL DEFAULT '1' COMMENT '下注币种：1（金币）、2（USDT）、3（TRX）',
                  other varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
                  other2 varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',
                  other3 varchar(520) DEFAULT NULL COMMENT '其它字段(有些三方需要的额外字段，这里可以使用)',

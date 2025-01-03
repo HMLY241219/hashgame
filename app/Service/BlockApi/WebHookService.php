@@ -86,6 +86,7 @@ class WebHookService extends BaseService
             'uid' => $userAddress['uid'],
             'game_id' => $game['game_id'],
             'bet_way' => EnumType::BET_WAY_TRANSFER,
+            'bet_block' => $transactionInfo,
             'bet_data' => [
                 [
                     'bet_level' => $betRoomLevel,

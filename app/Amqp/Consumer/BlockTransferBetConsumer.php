@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Amqp\Consumer;
 
 use App\Service\BlockApi\BlockApiService;
+use App\Service\BlockGamePeriodsService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
 use Hyperf\Amqp\Message\ConsumerMessage;
@@ -13,8 +14,8 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block', routingKey: 'transfer', queue: 'block-transfer', name: "BlockTransferConsumer", nums: 2)]
-class BlockTransferConsumer extends ConsumerMessage
+#[Consumer(exchange: 'block_transfer', routingKey: 'transfer_bet', queue: 'block-transfer-bet', name: "BlockTransferBetConsumer", nums: 2)]
+class BlockTransferBetConsumer extends ConsumerMessage
 {
     #[Inject]
     protected LoggerInterface $logger;
@@ -29,9 +30,9 @@ class BlockTransferConsumer extends ConsumerMessage
 
     public function consumeMessage($data, AMQPMessage $message): Result
     {
-        // 发起转账
-        $res = BlockApiService::sendTransaction($data['to_address'], (float)$data['amount'], $data['currency']);
-        if (!empty($res)) {
+        // 转账下注，结算并转账
+        $res = BlockGamePeriodsService::periodsSettlementByTransfer($data['bet_cache_key']);
+        if ($res === true) {
             return Result::ACK;
         } else {
             $this->logger->alert('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
