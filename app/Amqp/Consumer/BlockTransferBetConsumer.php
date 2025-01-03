@@ -35,7 +35,7 @@ class BlockTransferBetConsumer extends ConsumerMessage
         if ($res === true) {
             return Result::ACK;
         } else {
-            $this->logger->alert('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
+            $this->logger->error('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
             return Result::DROP;
         }
     }

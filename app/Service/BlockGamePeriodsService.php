@@ -331,7 +331,7 @@ class BlockGamePeriodsService extends BaseService
         // 下注信息
         $betData = self::getCache($betCacheKey);
         if (!$betData) {
-            self::logger()->error('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey . ' Not Found');
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey . ' Not Found');
             return 0;
         }
 
@@ -378,6 +378,7 @@ class BlockGamePeriodsService extends BaseService
             return true;
         } catch (\Throwable $e) {
             self::logger()->error('BlockGamePeriodsService.periodsSettlementByTransfer.Exception：' . $e->getMessage());
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.BetData：' . var_export($betData, true));
             return false;
         }
     }

@@ -31,8 +31,8 @@ class BlockSettlementConsumer extends ConsumerMessage
         if (!empty($res['block_number'])) {
             return Result::ACK;
         } else {
-            $this->logger->alert('BlockSettlementConsumer.Error.$data：' . var_export($data, true) );
-            $this->logger->alert('BlockSettlementConsumer.Error.$res：' . var_export($res, true) );
+            $this->logger->error('BlockSettlementConsumer.Error.$data：' . var_export($data, true) );
+            $this->logger->error('BlockSettlementConsumer.Error.$res：' . var_export($res, true) );
             return Result::DROP;
         }
     }
