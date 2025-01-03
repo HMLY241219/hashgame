@@ -31,7 +31,8 @@ class WebHookService extends BaseService
 
         // 检测是否是激活钱包
         $conf = SysConfService::getHashGameConf();
-        if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == $conf['active_transfer_currency']) {
+        if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == $conf['active_transfer_currency']
+            && $params['address'] == $conf['active_transfer_address']) {
             // 获取交易信息
             $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
             if (!$transactionInfo) {
