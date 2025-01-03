@@ -102,8 +102,8 @@ class CommonController extends AbstractController
         $is_h5 = $this->request->post('is_h5') ?? 1;
         if($is_h5 == 1){
             $response =  $this->guzzle->get("https://pro.ip-api.com/json/".$ip."?key=IKEH1fFMW5o1qKY");
-            if(!$response || !isset($response['countryCode']) || ($response['countryCode'] != 'IN' && $response['countryCode'] != 'TH')) return $this->ReturnJson->successFul(200,0);
-        }elseif((substr($netoperator, 0 , 3) != "405" && substr($netoperator, 0 , 3)!="404" && substr($netoperator, 0 , 3)!="406" && substr($netoperator, 0 , 3)!="525")  || (substr($simoperator, 0 , 3)!="405" && substr($simoperator, 0 , 3)!="404" && substr($simoperator, 0 , 3)!="406" && substr($simoperator, 0 , 3)!="525")){
+            if(!$response || !isset($response['countryCode']) || $response['countryCode'] == 'CN' ) return $this->ReturnJson->successFul(200,0);
+        }elseif(substr($netoperator, 0 , 3) == "460"  || substr($simoperator, 0 , 3) =="460"){
             return $this->ReturnJson->successFul(200,0);
         }
 
