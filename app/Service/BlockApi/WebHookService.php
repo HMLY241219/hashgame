@@ -24,6 +24,7 @@ class WebHookService extends BaseService
      */
     public static function handleData(array $params): void
     {
+        self::logger()->alert('WebHookService.handleData.$params：' . var_export($params, 1));
         // 检测参数
         $check = self::checkParams($params);
         // 网络
@@ -31,7 +32,9 @@ class WebHookService extends BaseService
 
         // 检测是否是激活钱包
         $conf = SysConfService::getHashGameConf();
-        if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == $conf['active_transfer_currency']) {
+        self::logger()->alert('WebHookService.handleData.$conf：' . var_export($conf, 1));
+        if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == strtolower($conf['active_transfer_currency'])
+            && $params['address'] == $conf['active_transfer_address']) {
             // 获取交易信息
             $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
             if (!$transactionInfo) {
@@ -86,6 +89,7 @@ class WebHookService extends BaseService
             'uid' => $userAddress['uid'],
             'game_id' => $game['game_id'],
             'bet_way' => EnumType::BET_WAY_TRANSFER,
+            'bet_block' => $transactionInfo,
             'bet_data' => [
                 [
                     'bet_level' => $betRoomLevel,

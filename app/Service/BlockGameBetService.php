@@ -2,12 +2,15 @@
 
 namespace App\Service;
 
+use App\Amqp\Producer\BlockTransferBetProducer;
 use App\Common\Common;
 use App\Common\User;
 use App\Controller\slots\DealWithController;
 use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
 use App\Service\BlockApi\BlockApiService;
+use Hyperf\Amqp\Producer;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\DbConnection\Db;
 
 /**
@@ -152,30 +155,34 @@ class BlockGameBetService extends BaseService
         // 检测参数
         list($game, $betData, $uInfo) = self::checkParams($params);
         // 下注区块
-        $betBlock = self::getBetBlock($game['network'], $game['play_method']); // 下注区块
+        $betBlock = $params['bet_block'] ?? self::getBetBlock($game['network'], $game['play_method']); // 下注区块
         // 缓存key前缀
         $checkCacheKeyPrefix = self::betDataCacheKey([
             'open_block' => $betBlock['block_number'],
             'network' => $game['network'],
             'uid' => $params['uid'],
         ]);
-        // 检测是否重复下注
-        if ($game['play_method'] == EnumType::PLAY_METHOD_HASH_BALANCE) {
-            $checkKeys = self::getCacheKeys($checkCacheKeyPrefix . '*');
-            if ($checkKeys) {
-                throw new ErrMsgException('Repeat the bet', 3015);
-            }
-        } else {
-            // 检测是否封盘
-            $increment = $game['play_method'] == EnumType::PLAY_METHOD_HASH_3M ? EnumType::NEXT_BLOCK_INCREMENT_3M : EnumType::NEXT_BLOCK_INCREMENT_1M;
-            if (($betBlock['timestamp'] + $increment * 3) - $currTime <= 3) { // 最后三秒不允许下注
-                throw new ErrMsgException('Do not bet', 3016);
-            }
 
-            // 追加下注
-            $checkKeys = self::getCacheKeys($checkCacheKeyPrefix . '*');
-            if ($checkKeys) {
-                $betData = self::addToBets($betData, $betBlock['block_number'], $game, $checkKeys);
+        // 余额下注需要检测，转账下注不需要
+        if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) {
+            // 检测是否重复下注
+            if ($game['play_method'] == EnumType::PLAY_METHOD_HASH_BALANCE) {
+                $checkKeys = self::getCacheKeys($checkCacheKeyPrefix . '*');
+                if ($checkKeys) {
+                    throw new ErrMsgException('Repeat the bet', 3015);
+                }
+            } else {
+                // 检测是否封盘
+                $increment = $game['play_method'] == EnumType::PLAY_METHOD_HASH_3M ? EnumType::NEXT_BLOCK_INCREMENT_3M : EnumType::NEXT_BLOCK_INCREMENT_1M;
+                if (($betBlock['timestamp'] + $increment * 3) - $currTime <= 3) { // 最后三秒不允许下注
+                    throw new ErrMsgException('Do not bet', 3016);
+                }
+
+                // 追加下注
+                $checkKeys = self::getCacheKeys($checkCacheKeyPrefix . '*');
+                if ($checkKeys) {
+                    $betData = self::addToBets($betData, $betBlock['block_number'], $game, $checkKeys);
+                }
             }
         }
 
@@ -209,18 +216,32 @@ class BlockGameBetService extends BaseService
             $bd['update_time'] = date(self::$dateTimeFormat, $currTime); // 更新时间;
             $bd['date'] = date('Ymd', $currTime); // 日期;
 
+            // 生成缓存key
+            if ($params['bet_way'] == EnumType::BET_WAY_TRANSFER) {
+                $bd['block_hash'] = $betBlock['block_hash']; // 区块hash
+                $bd['transaction_hash'] = $betBlock['transaction_hash']; // 交易hash
+                $bd['status'] = 9; // 此状态表示转账下注
+            }
             $cacheKey = self::betDataCacheKey($bd); // 缓存key
+
             try {
                 // 数据缓存
                 self::setCache($cacheKey, $bd);
-                // 更新用户余额
-                $updateData = [
-                    'coin_change' => -$bd['bet_amount'],
-                    'reason' => 1,
-                    'content' => "hash游戏订单[{$bd['bet_id']}]下注",
-                ];
-                if ($bd['bet_amount_bonus'] > 0) $updateData['bonus_change'] = -$bd['bet_amount_bonus'];
-                UserService::updateUserBalance($bd['uid'], $updateData);
+
+                if ($params['bet_way'] == EnumType::BET_WAY_BALANCE) { // 余额下注
+                    // 更新用户余额
+                    $updateData = [
+                        'coin_change' => -$bd['bet_amount'],
+                        'reason' => 1,
+                        'content' => "hash游戏订单[{$bd['bet_id']}]下注",
+                    ];
+                    if ($bd['bet_amount_bonus'] > 0) $updateData['bonus_change'] = -$bd['bet_amount_bonus'];
+                    UserService::updateUserBalance($bd['uid'], $updateData);
+                } elseif ($params['bet_way'] == EnumType::BET_WAY_TRANSFER) { // 转账下注
+                    // MQ生产消息
+                    $producer = ApplicationContext::getContainer()->get(Producer::class); // 注入生产者
+                    $producer->produce(new BlockTransferBetProducer(['bet_cache_key' => $cacheKey]));
+                }
             } catch (\Exception $e) {
                 self::delCache($cacheKey);
                 self::logger()->alert('BlockGameBetService.cacheGameBet：' . $e->getMessage());
@@ -568,6 +589,7 @@ class BlockGameBetService extends BaseService
                     'is_sports' => 0,
                     'is_settlement' => 1,
                     'really_betAmount' => 0,
+                    'bet_currency' => $d['bet_currency'],
                     'other' => json_encode([
                         'block_number' => $d['open_block'],
                         'block_hash' => $d['block_hash'],
@@ -580,7 +602,9 @@ class BlockGameBetService extends BaseService
                 $slotsLogData[] = $log;
 
                 // 将数据统一存入到Redis，用户出来以后在统计总输赢,流水等
-                $dealWith->setUserWaterTransferAmount($log);
+                if ($d['bet_way'] == EnumType::BET_WAY_BALANCE) {
+                    $dealWith->setUserWaterTransferAmount($log);
+                }
             }
             if ($slotsLogData) {
                 // 批量插入记录
