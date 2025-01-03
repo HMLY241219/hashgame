@@ -100,6 +100,7 @@ class TronNodeService extends BaseService
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
         $res = $tron->getTransactionInfo($tranHash);
+        self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
         $info = [];
         if (!empty($res['id'])) {
             $info['hash'] = $res['id'] ?? '';
