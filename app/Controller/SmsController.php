@@ -20,7 +20,7 @@ class SmsController extends AbstractController {
     #[RequestMapping(path: "code", methods: "get,post")	]
     public function code(){
 
-        $phone = $this->request->post('phone');
+        $phone = $this->request->post('phone');  //这里手机号需要带区号 84是越南
         $randnum = mt_rand(1000,9999);
 
         //检查手机号是否正确
@@ -130,7 +130,8 @@ class SmsController extends AbstractController {
         $sign = md5($apiKey.$apiSecret.$timeStamp);
 
         $dataArr['appId'] = $appId;
-        $dataArr['numbers'] = '91'.$phone;
+//        $dataArr['numbers'] = '84'.$phone;
+        $dataArr['numbers'] = $phone;
         $dataArr['content'] = $content;
         $dataArr['senderId'] = '';
 
