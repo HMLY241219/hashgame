@@ -24,6 +24,7 @@ class WebHookService extends BaseService
      */
     public static function handleData(array $params): void
     {
+        self::logger()->alert('WebHookService.handleData.$params：' . var_export($params, 1));
         // 检测参数
         $check = self::checkParams($params);
         // 网络
