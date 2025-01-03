@@ -196,7 +196,7 @@ class BlockGamePeriodsService extends BaseService
         // 游戏期数数据
         list($gamePeriodsList, $gameRuleList) = self::packagePeriodsData($openBlockInfo, $network);
         // 获取当前区块待结算的下注
-        $betUsers = $betDataList = $settlementCacheKeys = $userCoinChange = [];
+        $betUsers = $betDataList = $settlementCacheKeys = $userCoinChange = $needTransferBackData = [];
         $cacheKeys = self::getCacheKeys(self::getBetDataCachePrefix([
             'network' => $network,
             'block_number' => $currOpenBlockNumber,
@@ -220,7 +220,9 @@ class BlockGamePeriodsService extends BaseService
                 continue;
             }
             $roomLevelChar = BlockGameService::getBetRoomLevelByNumber((int)$betData['bet_level']);
-            $openRule = $gameRule['page_bet_rule'][$roomLevelChar];
+            $openRule = $betData['bet_way'] == EnumType::BET_WAY_TRANSFER ?
+                $gameRule['transfer_bet_rule'][$roomLevelChar] :
+                $gameRule['page_bet_rule'][$roomLevelChar];
 
             // 更新下注数据
             $betData['periods_id'] = $openPeriods['periods_id']; // 游戏期数ID
@@ -265,6 +267,15 @@ class BlockGamePeriodsService extends BaseService
                         'bonus_change' => $betData['settlement_amount_bonus'],
                     ];
                 }
+            } elseif ($betData['bet_way'] == EnumType::BET_WAY_TRANSFER) { // 下注方式为转账下注
+                // 是否需要结算回用户钱包地址
+                if ($betData['settlement_amount'] > 0) {
+                    $needTransferBackData[] = [
+                        'amount' => $betData['settlement_amount'] / self::$amountDecimal,
+                        'to_address' => $betData['bet_address'],
+                        'currency' => self::getBetCurrencyByNumber($betData['bet_currency']),
+                    ];
+                }
             }
 
             $betDataList[] = $betData;
@@ -307,7 +318,16 @@ class BlockGamePeriodsService extends BaseService
             // 清除下注缓存数据
             array_map(function ($key) { self::delCache($key); }, $settlementCacheKeys);
 
-            unset($settlementCacheKeys, $gamePeriodsList);
+            // 需要结算回用户钱包地址的数据
+            if ($needTransferBackData) {
+                $producer = ApplicationContext::getContainer()->get(Producer::class); // 注入生产者
+                foreach ($needTransferBackData as $v) {
+                    // MQ生产消息
+                    $producer->produce(new BlockTransferProducer($v));
+                }
+            }
+
+            unset($settlementCacheKeys, $gamePeriodsList, $needTransferBackData);
             return $currOpenBlockNumber;
         } catch (\Exception $e) {
             // 解锁

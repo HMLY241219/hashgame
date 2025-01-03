@@ -216,8 +216,8 @@ class BlockGameBetService extends BaseService
             $bd['update_time'] = date(self::$dateTimeFormat, $currTime); // 更新时间;
             $bd['date'] = date('Ymd', $currTime); // 日期;
 
-            // 生成缓存key
-            if ($params['bet_way'] == EnumType::BET_WAY_TRANSFER) {
+            // 生成缓存key，3S转账投注则以转账区块hash结算
+            if ($params['bet_way'] == EnumType::BET_WAY_TRANSFER && $game['play_method'] == EnumType::PLAY_METHOD_HASH_BALANCE) {
                 $bd['block_hash'] = $betBlock['block_hash']; // 区块hash
                 $bd['transaction_hash'] = $betBlock['transaction_hash']; // 交易hash
                 $bd['status'] = 9; // 此状态表示转账下注
