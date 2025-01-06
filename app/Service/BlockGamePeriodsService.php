@@ -362,7 +362,7 @@ class BlockGamePeriodsService extends BaseService
             $game = BlockGameService::getGameInfo($betData['game_id']);
             self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$game：' . var_export($game, 1));
             // 当前游戏当前区块开奖结果
-            $openRes = self::getOpenResult($betData['block_hash'], (string)$betData['block_number'], $game['game_type_second']);
+            $openRes = self::getOpenResult($betData['block_hash'], (string)$betData['open_block'], $game['game_type_second']);
             self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$openRes：' . var_export($openRes, 1));
 
             // 当前游戏下注开奖规则
@@ -371,7 +371,7 @@ class BlockGamePeriodsService extends BaseService
 
             // 更新下注数据
             $betData['periods_id'] = 0; // 游戏期数ID
-            $betData['curr_periods'] = $betData['block_number']; // 当前期数
+            $betData['curr_periods'] = $betData['open_block']; // 当前期数
             $betData['is_open'] = EnumType::BET_IS_OPEN_YES; // 已开奖
             $betData['open_data'] = json_encode($openRes['data']); // 开奖数据
             $betData['open_result'] = $openRes['result']; // 开奖结果
