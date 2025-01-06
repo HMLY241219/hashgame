@@ -39,7 +39,7 @@ class BlockTransferBetConsumer extends ConsumerMessage
                 return Result::DROP;
             }
         } catch (\Throwable $e) {
-            $this->logger->error('BlockTransferBetConsumer.Exception：' . $e->getMessage());
+            $this->logger->error('BlockTransferBetConsumer.Exception：' . $e->getTraceAsString());
             if ($e->getCode() == 3017) {
                 return Result::REQUEUE;
             } else {
