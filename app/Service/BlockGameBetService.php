@@ -2,9 +2,8 @@
 
 namespace App\Service;
 
-use App\Amqp\Producer\BlockTransferBetProducer;
+use App\Amqp\Producer\BlockTransferBetSettlementProducer;
 use App\Common\Common;
-use App\Common\User;
 use App\Controller\slots\DealWithController;
 use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
@@ -240,7 +239,7 @@ class BlockGameBetService extends BaseService
                 } elseif ($params['bet_way'] == EnumType::BET_WAY_TRANSFER) { // 转账下注
                     // MQ生产消息
                     $producer = ApplicationContext::getContainer()->get(Producer::class); // 注入生产者
-                    $producer->produce(new BlockTransferBetProducer(['bet_cache_key' => $cacheKey]));
+                    $producer->produce(new BlockTransferBetSettlementProducer(['bet_cache_key' => $cacheKey]));
                 }
             } catch (\Exception $e) {
                 self::delCache($cacheKey);

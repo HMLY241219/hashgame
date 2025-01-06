@@ -17,12 +17,11 @@ class WebHookService extends BaseService
 {
     /**
      * 获取最新区块
-     * @return void
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function handleData(array $params): void
+    public static function handleData(array $params)
     {
         self::logger()->alert('WebHookService.handleData.$params：' . var_export($params, 1));
         // 检测参数
@@ -38,12 +37,12 @@ class WebHookService extends BaseService
             // 获取交易信息
             $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
             if (!$transactionInfo) {
-                throw new ErrMsgException('Transaction not found');
+                throw new ErrMsgException('Transaction not found', 3017);
             }
             // 激活钱包
             UserService::addressActive($transactionInfo['from_address']);
 
-            return;
+            return true;
         }
 
         // 检测当前交易hash是否已经下过注
@@ -69,12 +68,13 @@ class WebHookService extends BaseService
         }
 
         // 获取交易信息
+
         $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
         if (!$transactionInfo) {
-            throw new ErrMsgException('Transaction not found');
+            throw new ErrMsgException('Transaction not found', 3017);
         }
         self::logger()->alert('handleData.$transactionInfo：' . var_export($transactionInfo, 1));
-        return;
+        return false;
 
         // 获取转账钱包对应绑定的用户
         $userAddress = self::getPoolTb('user_wallet_address')->where('address', $transactionInfo['from_address'])
@@ -105,6 +105,8 @@ class WebHookService extends BaseService
 
         // 缓存交易hash下注标识
         self::setCache($hTbName, ['is_bet' => 1]);
+
+        return true;
     }
 
     /**

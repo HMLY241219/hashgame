@@ -394,4 +394,8 @@ return [
         'en' => "The current period number has been closed can not be bet",
         'hi' => '',
     ],
+    '3017' => [ // 区块交易信息未找到
+        'en' => "Block transaction information is not found",
+        'hi' => '',
+    ],
 ];

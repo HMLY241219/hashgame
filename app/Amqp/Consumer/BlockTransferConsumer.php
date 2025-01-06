@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Amqp\Consumer;
 
+use App\Service\BlockApi\BlockApiService;
 use App\Service\BlockApi\TronNodeService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
@@ -27,7 +28,7 @@ class BlockTransferConsumer extends ConsumerMessage
     public function consumeMessage($data, AMQPMessage $message): Result
     {
         // 发起转账
-        $res = TronNodeService::sendTransaction($data['to_address'], $data['amount'], $data['currency']);
+        $res = BlockApiService::sendTransaction($data['to_address'], (float)$data['amount'], $data['currency']);
         if (!empty($res)) {
             return Result::ACK;
         } else {

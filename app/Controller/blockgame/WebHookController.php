@@ -11,25 +11,18 @@ namespace App\Controller\blockgame;
 
 
 
+use App\Amqp\Consumer\BlockTransferBetConsumer;
 use App\Controller\AbstractController;
-use App\Enum\EnumType;
 use App\Exception\ErrMsgException;
-use App\Service\BaseService;
-use App\Service\BlockApi\BlockApiService;
-use App\Service\BlockApi\WebHookService;
-use App\Service\BlockGameBetService;
-use App\Service\BlockGameService;
-use App\Service\WebSocket\WSSocketService;
-use Hyperf\HttpServer\Annotation\GetMapping;
-use Hyperf\HttpServer\Annotation\PostMapping;
+use Hyperf\Amqp\Producer;
 use Hyperf\HttpServer\Annotation\Controller;
 use Hyperf\HttpServer\Annotation\RequestMapping;
-use Psr\Container\ContainerExceptionInterface;
-use Psr\Container\NotFoundExceptionInterface;
-use WsProto\Block\MessageId;
+use Hyperf\Di\Annotation\Inject;
 
 #[Controller(prefix:"webhook")]
 class WebHookController extends AbstractController{
+    #[Inject]
+    public Producer $producer;
 
     /**
      * 钱包转账监听
@@ -40,7 +33,8 @@ class WebHookController extends AbstractController{
     {
         try {
             $params = $this->request->getParsedBody();
-            WebHookService::handleData($params);
+            // MQ生产消息
+            $this->producer->produce(new BlockTransferBetConsumer($params));
             return $this->response->write('ok');
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());

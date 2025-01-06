@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Amqp\Consumer;
 
 use App\Service\BlockApi\BlockApiService;
+use App\Service\BlockApi\WebHookService;
 use App\Service\BlockGamePeriodsService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
@@ -31,12 +32,23 @@ class BlockTransferBetConsumer extends ConsumerMessage
     public function consumeMessage($data, AMQPMessage $message): Result
     {
         // 转账下注，结算并转账
-        $res = BlockGamePeriodsService::periodsSettlementByTransfer($data['bet_cache_key']);
-        if ($res === true) {
-            return Result::ACK;
-        } else {
-            $this->logger->error('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
-            return Result::DROP;
+        try {
+            $res = WebHookService::handleData($data);
+            if ($res === true) {
+                return Result::ACK;
+            } else {
+                $this->logger->error('BlockTransferBetConsumer.Error.$data：' . var_export($data, true) );
+                return Result::DROP;
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('BlockTransferBetConsumer.Exception：' . $e->getMessage());
+            if ($e->getCode() == 3017) {
+                return Result::REQUEUE;
+            } else {
+                return Result::DROP;
+            }
         }
+
+
     }
 }

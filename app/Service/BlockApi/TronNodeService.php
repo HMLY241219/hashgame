@@ -107,26 +107,25 @@ class TronNodeService extends BaseService
             $info['block_number'] = $res['blockNumber'] ?? '';
             $info['block_hash'] = '';
             $info['timestamp'] = $res['blockTimeStamp'] / 1000;
+            if (empty($res['log'])) { // 本链币交易
+                $res2 = $tron->getTransaction($tranHash);
+                $info['symbol'] = EnumType::TOKEN_SYMBOL_TRX;
+                $info['from_address'] = $info['to_address'] = $info['amount'] = 0;
+                if (!empty($res2['raw_data'])) {
+                    $info['from_address'] = $tron->hexString2Address($res2['raw_data']['contract'][0]['parameter']['value']['owner_address']);
+                    $info['to_address'] = $tron->hexString2Address($res2['raw_data']['contract'][0]['parameter']['value']['to_address']);
+                    $info['amount'] = $res2['raw_data']['contract'][0]['parameter']['value']['amount'] / 1000000;
+                } else {
+                    self::logger()->alert('TronNodeService.getTransactionInfo.$res2：' . var_export($res2, 1));
+                }
+            } else { // 代币交易
+                $info['symbol'] = EnumType::TOKEN_SYMBOL_USDT;
+                $info['from_address'] = $tron->hexString2Address('41' . substr($res['log'][0]['topics'][1], 24));
+                $info['to_address'] = $tron->hexString2Address('41' . substr($res['log'][0]['topics'][2], 24));
+                $info['amount'] = hexdec($res['log'][0]['data']) / 1000000;
+            }
         } else {
             self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
-        }
-
-        if (empty($res['log'])) { // 本链币交易
-            $res2 = $tron->getTransaction($tranHash);
-            $info['symbol'] = EnumType::TOKEN_SYMBOL_TRX;
-            $info['from_address'] = $info['to_address'] = $info['amount'] = 0;
-            if (!empty($res2['raw_data'])) {
-                $info['from_address'] = $tron->hexString2Address($res2['raw_data']['contract'][0]['parameter']['value']['owner_address']);
-                $info['to_address'] = $tron->hexString2Address($res2['raw_data']['contract'][0]['parameter']['value']['to_address']);
-                $info['amount'] = $res2['raw_data']['contract'][0]['parameter']['value']['amount'] / 1000000;
-            } else {
-                self::logger()->alert('TronNodeService.getTransactionInfo.$res2：' . var_export($res2, 1));
-            }
-        } else { // 代币交易
-            $info['symbol'] = EnumType::TOKEN_SYMBOL_USDT;
-            $info['from_address'] = $tron->hexString2Address('41' . substr($res['log'][0]['topics'][1], 24));
-            $info['to_address'] = $tron->hexString2Address('41' . substr($res['log'][0]['topics'][2], 24));
-            $info['amount'] = hexdec($res['log'][0]['data']) / 1000000;
         }
 
         return $info;
