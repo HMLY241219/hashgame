@@ -130,6 +130,9 @@ class TronNodeService extends BaseService
                 $info['to_address'] = $tron->hexString2Address('41' . substr($res['log'][0]['topics'][2], 24));
                 $info['amount'] = hexdec($res['log'][0]['data']) / 1000000;
             }
+            // 获取区块信息
+            $block = self::getBlockInfo((int)$info['block_number'], false);
+            $info['block_hash'] = $block['block_hash'];
         } else {
             self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
         }
