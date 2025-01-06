@@ -30,7 +30,6 @@ class WebHookController extends AbstractController{
     {
         try {
             $params = $this->request->getParsedBody();
-            $this->logger->alert('WebHookController.hook.$params' . var_export($params, true));
             // MQ生产消息
             $this->producer->produce(new BlockTransferBetProducer($params));
             return $this->response->write('ok');
