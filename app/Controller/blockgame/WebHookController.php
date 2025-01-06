@@ -4,14 +4,11 @@
  */
 declare(strict_types=1);
 /**
- * 游戏
+ * 地址监听
  */
-
 namespace App\Controller\blockgame;
 
-
-
-use App\Amqp\Consumer\BlockTransferBetConsumer;
+use App\Amqp\Producer\BlockTransferBetProducer;
 use App\Controller\AbstractController;
 use App\Exception\ErrMsgException;
 use Hyperf\Amqp\Producer;
@@ -34,7 +31,7 @@ class WebHookController extends AbstractController{
         try {
             $params = $this->request->getParsedBody();
             // MQ生产消息
-            $this->producer->produce(new BlockTransferBetConsumer($params));
+            $this->producer->produce(new BlockTransferBetProducer($params));
             return $this->response->write('ok');
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());

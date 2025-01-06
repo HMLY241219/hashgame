@@ -17,6 +17,8 @@ class WebHookService extends BaseService
 {
     /**
      * 获取最新区块
+     * @param array $params
+     * @return bool
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
