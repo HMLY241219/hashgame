@@ -98,8 +98,13 @@ class TronNodeService extends BaseService
      */
     public static function getTransactionInfo(string $tranHash): array
     {
-        $tron = new Tron(new HttpProvider(env('URL_TRON_NODE_2', self::$baseUrl)));
-        $res = $tron->getTransactionInfo($tranHash);
+        // 从远程api获取
+        $url = self::getApiUrl('wallet/gettransactioninfobyid');
+        $res = json_decode(Curl::post(
+            $url,
+            ['value' => $tranHash],
+            ["Content-Type: application/json"]
+        ), true);
         self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
         $info = [];
         if (!empty($res['id'])) {
@@ -107,6 +112,8 @@ class TronNodeService extends BaseService
             $info['block_number'] = $res['blockNumber'] ?? '';
             $info['block_hash'] = '';
             $info['timestamp'] = $res['blockTimeStamp'] / 1000;
+
+            $tron = new Tron(new HttpProvider(env('URL_TRON_NODE', self::$baseUrl)));
             if (empty($res['log'])) { // 本链币交易
                 $res2 = $tron->getTransaction($tranHash);
                 $info['symbol'] = EnumType::TOKEN_SYMBOL_TRX;
