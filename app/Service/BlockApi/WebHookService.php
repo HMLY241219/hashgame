@@ -25,7 +25,6 @@ class WebHookService extends BaseService
      */
     public static function handleData(array $params)
     {
-        self::logger()->alert('WebHookService.handleData.$params：' . var_export($params, 1));
         // 检测参数
         $check = self::checkParams($params);
         // 网络
@@ -33,7 +32,6 @@ class WebHookService extends BaseService
 
         // 检测是否是激活钱包
         $conf = SysConfService::getHashGameConf();
-        self::logger()->alert('WebHookService.handleData.$conf：' . var_export($conf, 1));
         if ($check['amount'] == $conf['active_transfer_amount'] && $check['symbol'] == strtolower($conf['active_transfer_currency'])
             && $params['address'] == $conf['active_transfer_address']) {
             // 获取交易信息
@@ -45,6 +43,12 @@ class WebHookService extends BaseService
             UserService::addressActive($transactionInfo['from_address']);
 
             return true;
+        }
+
+        // 添加缓存锁，避免多个进程相同交易hash同时下注
+        $lockKey = EnumType::LOCK_BET_BY_TRANS_HASH .'_'. $network . '_'. $params['txid'];
+        if (!self::setCacheLock($lockKey, 5)) {
+            throw new ErrMsgException('Repeat the bet', 3015);
         }
 
         // 检测当前交易hash是否已经下过注
@@ -70,7 +74,6 @@ class WebHookService extends BaseService
         }
 
         // 获取交易信息
-
         $transactionInfo = BlockApiService::getTransactionInfo($params['txid'], $network);
         if (!$transactionInfo) {
             throw new ErrMsgException('Transaction not found', 3017);
@@ -87,7 +90,7 @@ class WebHookService extends BaseService
         $betArea = BlockGameBetService::getAddressBetArea((int)$check['amount'], $game['game_type_second']);
 
         // 缓存下注数据
-        BlockGameBetService::cacheGameBet([
+        $res = BlockGameBetService::cacheGameBet([
             'uid' => $userAddress['uid'],
             'game_id' => $game['game_id'],
             'bet_way' => EnumType::BET_WAY_TRANSFER,
@@ -102,6 +105,10 @@ class WebHookService extends BaseService
                 ]
             ],
         ]);
+        // 打印下注
+        if ($res) {
+            self::logger()->alert('WebHookService.handleData.bet：' . var_export($res, true));
+        }
 
         // 缓存交易hash下注标识
         self::setCache($hTbName, ['is_bet' => 1]);

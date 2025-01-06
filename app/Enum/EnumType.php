@@ -8,6 +8,7 @@ class EnumType
     public const WS_CLIENT_PUSH_BLOCK = 'WS_PUSH_BLOCK'; // websocket客户端链接推送区块
     // 缓存锁
     public const LOCK_LAST_OPEN_BLOCK = 'LOCK_LAST_OPEN_BLOCK'; // 锁定最后开奖区块
+    public const LOCK_BET_BY_TRANS_HASH = 'LOCK_BET_BY_TRANS_HASH'; // 锁定转账下注交易hash
     // 区块网络
     public const NETWORK_TRX = 1; // 波场
     public const NETWORK_ETH = 2; // 以太坊
