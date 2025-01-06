@@ -29,11 +29,9 @@ class BlockTransferBetSettlementConsumer extends ConsumerMessage
 
     public function consumeMessage($data, AMQPMessage $message): Result
     {
-        $this->logger->alert('BlockTransferBetSettlementConsumer.$data：' . var_export($data, true) );
         // 转账下注，结算并转账
         $res = BlockGamePeriodsService::periodsSettlementByTransfer($data['bet_cache_key']);
         if ($res === true) {
-            $this->logger->alert('BlockTransferBetSettlementConsumer.success：' . var_export($data, true) );
             return Result::ACK;
         } else {
             $this->logger->error('BlockTransferBetSettlementConsumer.Error.$data：' . var_export($data, true) );
