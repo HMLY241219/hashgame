@@ -345,53 +345,54 @@ class BlockGamePeriodsService extends BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function periodsSettlementByTransfer(string $betCacheKey)
+    public static function periodsSettlementByTransfer(string $betCacheKey): bool|int
     {
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey);
-        $currTime = time();
-        // 下注信息
-        $betData = self::getCache($betCacheKey);
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData：' . $betData);
-        if (!$betData) {
-            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey . ' Not Found');
-            return 0;
-        }
-
-        // 获取游戏信息
-        $game = BlockGameService::getGameInfo($betData['game_id']);
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$game：' . $game);
-        // 当前游戏当前区块开奖结果
-        $openRes = self::getOpenResult($betData['block_hash'], (string)$betData['block_number'], $game['game_type_second']);
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$openRes：' . $openRes);
-
-        // 当前游戏下注开奖规则
-        $roomLevelChar = BlockGameService::getBetRoomLevelByNumber((int)$betData['bet_level']);
-        $openRule = $game['transfer_bet_rule'][$roomLevelChar];
-
-        // 更新下注数据
-        $betData['periods_id'] = 0; // 游戏期数ID
-        $betData['curr_periods'] = $betData['block_number']; // 当前期数
-        $betData['is_open'] = EnumType::BET_IS_OPEN_YES; // 已开奖
-        $betData['open_data'] = json_encode($openRes['data']); // 开奖数据
-        $betData['open_result'] = $openRes['result']; // 开奖结果
-        $betData['open_time'] = date(self::$dateTimeFormat, $currTime); // 开奖时间
-        $betData['is_valid'] = EnumType::BET_IS_VALID_YES; // 是否有效
-        // 根据开奖结果获取下注结果
-        $betRes = self::getBetResult($betData, $openRes['result'], json_decode($betData['open_data'], true), $openRule, (int)$game['game_type_second']);
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betRes：' . $betRes);
-        $betData['is_win'] = $betRes['is_win']; // 输赢状态
-        $betData['win_lose_amount'] = $betRes['win_lose_amount']; // 输赢金额-cash
-        $betData['win_lose_amount_bonus'] = $betRes['win_lose_amount_bonus']; // 输赢金额-bonus
-        $betData['settlement_amount'] = $betRes['settlement_amount']; // 结算金额-cash
-        $betData['settlement_amount_bonus'] = $betRes['settlement_amount_bonus']; // 结算金额-bonus
-        $betData['sxfee_ratio'] = $betRes['sxfee_ratio'] ?? 0; // 手续费率
-        $betData['sxfee_amount'] = $betRes['sxfee_amount'] ?? 0; // 手续费-cash
-        $betData['sxfee_amount_bonus'] = $betRes['sxfee_amount_bonus'] ?? 0; // 手续费-bonus
-        $betData['refund_amount'] = $betRes['refund_amount'] ?? 0; // 退还金额-cash
-        $betData['refund_amount_bonus'] = $betRes['refund_amount_bonus'] ?? 0; // 退还金额-bonus
-        $betData['status'] = $betRes['status']; // 下注状态：0（待结算）、1（已完成）、2（已退款）
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData2：' . $betData);
         try {
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey);
+            $currTime = time();
+            // 下注信息
+            $betData = self::getCache($betCacheKey);
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData：' . $betData);
+            if (!$betData) {
+                self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey . ' Not Found');
+                return 0;
+            }
+
+            // 获取游戏信息
+            $game = BlockGameService::getGameInfo($betData['game_id']);
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$game：' . $game);
+            // 当前游戏当前区块开奖结果
+            $openRes = self::getOpenResult($betData['block_hash'], (string)$betData['block_number'], $game['game_type_second']);
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$openRes：' . $openRes);
+
+            // 当前游戏下注开奖规则
+            $roomLevelChar = BlockGameService::getBetRoomLevelByNumber((int)$betData['bet_level']);
+            $openRule = $game['transfer_bet_rule'][$roomLevelChar];
+
+            // 更新下注数据
+            $betData['periods_id'] = 0; // 游戏期数ID
+            $betData['curr_periods'] = $betData['block_number']; // 当前期数
+            $betData['is_open'] = EnumType::BET_IS_OPEN_YES; // 已开奖
+            $betData['open_data'] = json_encode($openRes['data']); // 开奖数据
+            $betData['open_result'] = $openRes['result']; // 开奖结果
+            $betData['open_time'] = date(self::$dateTimeFormat, $currTime); // 开奖时间
+            $betData['is_valid'] = EnumType::BET_IS_VALID_YES; // 是否有效
+            // 根据开奖结果获取下注结果
+            $betRes = self::getBetResult($betData, $openRes['result'], json_decode($betData['open_data'], true), $openRule, (int)$game['game_type_second']);
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betRes：' . $betRes);
+            $betData['is_win'] = $betRes['is_win']; // 输赢状态
+            $betData['win_lose_amount'] = $betRes['win_lose_amount']; // 输赢金额-cash
+            $betData['win_lose_amount_bonus'] = $betRes['win_lose_amount_bonus']; // 输赢金额-bonus
+            $betData['settlement_amount'] = $betRes['settlement_amount']; // 结算金额-cash
+            $betData['settlement_amount_bonus'] = $betRes['settlement_amount_bonus']; // 结算金额-bonus
+            $betData['sxfee_ratio'] = $betRes['sxfee_ratio'] ?? 0; // 手续费率
+            $betData['sxfee_amount'] = $betRes['sxfee_amount'] ?? 0; // 手续费-cash
+            $betData['sxfee_amount_bonus'] = $betRes['sxfee_amount_bonus'] ?? 0; // 手续费-bonus
+            $betData['refund_amount'] = $betRes['refund_amount'] ?? 0; // 退还金额-cash
+            $betData['refund_amount_bonus'] = $betRes['refund_amount_bonus'] ?? 0; // 退还金额-bonus
+            $betData['status'] = $betRes['status']; // 下注状态：0（待结算）、1（已完成）、2（已退款）
+            self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData2：' . $betData);
+
             // 保存下注数据
             BlockGameBetService::saveBetData([$betData]);
             // 清除下注缓存数据
