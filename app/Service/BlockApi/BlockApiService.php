@@ -57,7 +57,7 @@ class BlockApiService
     {
         return match ($network) {
 //            EnumType::NETWORK_TRX => TronScanService::getTransactionInfo($tranHash),
-            EnumType::NETWORK_TRX => TronNodeService::getTransactionInfo($tranHash, $network),
+            EnumType::NETWORK_TRX => TronNodeService::getTransactionInfo($tranHash),
             EnumType::NETWORK_ETH => [],
             EnumType::NETWORK_BSC => BscScanService::getTransactionInfo($tranHash),
         };
