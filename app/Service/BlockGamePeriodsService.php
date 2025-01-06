@@ -403,8 +403,8 @@ class BlockGamePeriodsService extends BaseService
             }
             return true;
         } catch (\Throwable $e) {
-            self::logger()->error('BlockGamePeriodsService.periodsSettlementByTransfer.Exception：' . $e->getMessage());
             self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.BetData：' . var_export($betData, true));
+            self::logger()->error('BlockGamePeriodsService.periodsSettlementByTransfer.Exception：' . $e->getMessage() . $e->getTraceAsString());
             return false;
         }
     }
