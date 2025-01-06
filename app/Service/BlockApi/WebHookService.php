@@ -73,6 +73,8 @@ class WebHookService extends BaseService
         if (!$transactionInfo) {
             throw new ErrMsgException('Transaction not found');
         }
+        self::logger()->alert('handleData.$transactionInfo：' . var_export($transactionInfo, 1));
+        return;
 
         // 获取转账钱包对应绑定的用户
         $userAddress = self::getPoolTb('user_wallet_address')->where('address', $transactionInfo['from_address'])
