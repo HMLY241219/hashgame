@@ -347,9 +347,11 @@ class BlockGamePeriodsService extends BaseService
      */
     public static function periodsSettlementByTransfer(string $betCacheKey)
     {
+        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey);
         $currTime = time();
         // 下注信息
         $betData = self::getCache($betCacheKey);
+        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData：' . $betData);
         if (!$betData) {
             self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betCacheKey：' . $betCacheKey . ' Not Found');
             return 0;
@@ -357,6 +359,7 @@ class BlockGamePeriodsService extends BaseService
 
         // 获取游戏信息
         $game = BlockGameService::getGameInfo($betData['game_id']);
+        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$game：' . $game);
         // 当前游戏当前区块开奖结果
         $openRes = self::getOpenResult($betData['block_hash'], (string)$betData['block_number'], $game['game_type_second']);
         self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$openRes：' . $openRes);
@@ -387,7 +390,7 @@ class BlockGamePeriodsService extends BaseService
         $betData['refund_amount'] = $betRes['refund_amount'] ?? 0; // 退还金额-cash
         $betData['refund_amount_bonus'] = $betRes['refund_amount_bonus'] ?? 0; // 退还金额-bonus
         $betData['status'] = $betRes['status']; // 下注状态：0（待结算）、1（已完成）、2（已退款）
-        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData：' . $betData);
+        self::logger()->alert('BlockGamePeriodsService.periodsSettlementByTransfer.$betData2：' . $betData);
         try {
             // 保存下注数据
             BlockGameBetService::saveBetData([$betData]);
