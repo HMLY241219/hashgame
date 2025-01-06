@@ -99,7 +99,6 @@ class TronNodeService extends BaseService
     public static function getTransactionInfo(string $tranHash): array
     {
         $tron = new Tron(new HttpProvider(env('URL_TRON_NODE_2', self::$baseUrl)));
-        $tron->getTransaction();
         $res = $tron->getTransactionInfo($tranHash);
         self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
         $info = [];
