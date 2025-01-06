@@ -105,7 +105,6 @@ class TronNodeService extends BaseService
             ['value' => $tranHash],
             ["Content-Type: application/json"]
         ), true);
-        self::logger()->alert('TronNodeService.getTransactionInfo.$res：' . var_export($res, 1));
         $info = [];
         if (!empty($res['id'])) {
             $info['hash'] = $res['id'] ?? '';
