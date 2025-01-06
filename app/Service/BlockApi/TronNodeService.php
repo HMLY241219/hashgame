@@ -107,7 +107,7 @@ class TronNodeService extends BaseService
         ), true);
         $info = [];
         if (!empty($res['id'])) {
-            $info['hash'] = $res['id'] ?? '';
+            $info['transaction_hash'] = $res['id'] ?? '';
             $info['block_number'] = $res['blockNumber'] ?? '';
             $info['block_hash'] = '';
             $info['timestamp'] = $res['blockTimeStamp'] / 1000;
