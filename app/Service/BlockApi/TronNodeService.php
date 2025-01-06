@@ -178,6 +178,8 @@ class TronNodeService extends BaseService
             } elseif ($currency == EnumType::BET_CURRENCY_CHAR_USDT) {
                 $contract = $tron->contract(EnumType::CURRENCY_CONTRACT_TRON_USDT);
                 $res = $contract->transfer($toAddress, (string)$amount);
+            } else {
+                $res = [];
             }
             $info = [];
             if (isset($res['result']) && $res['result'] === true) {
@@ -188,12 +190,11 @@ class TronNodeService extends BaseService
                 $info['symbol'] = $currency;
                 $info['timestamp'] = round($res['raw_data']['timestamp'] / 1000);
             } else {
-                self::logger()->alert('TronNodeService.sendTransaction.res：' . var_export($res, true));
+                self::logger()->alert('TronNodeService.sendTransaction.Fail.res：' . var_export($res, true));
             }
             return $info;
         } catch (TronException $e) {
-            self::logger()->alert('TronNodeService.sendTransaction.Exception：' . $e->getTraceAsString());
-            self::logger()->alert('TronNodeService.sendTransaction.Exception：' . $e->getMessage());
+            self::logger()->alert('TronNodeService.sendTransaction.Exception：' . $e->getMessage() . $e->getTraceAsString());
             return [];
         }
     }

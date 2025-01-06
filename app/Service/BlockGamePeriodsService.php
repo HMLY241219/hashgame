@@ -393,7 +393,7 @@ class BlockGamePeriodsService extends BaseService
             self::delCache($betCacheKey);
             // 转账
             if ($betData['settlement_amount'] > 0 && !empty($betData['bet_address'])) {
-                BlockApiService::sendTransaction($betData['bet_address'], (float)$betData['settlement_amount'], self::getBetCurrencyByNumber($betData['bet_currency']));
+                BlockApiService::sendTransaction($betData['bet_address'], (float)$betData['settlement_amount'] / self::$amountDecimal, self::getBetCurrencyByNumber($betData['bet_currency']));
             }
             return true;
         } catch (\Throwable $e) {
