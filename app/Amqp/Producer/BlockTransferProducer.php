@@ -10,7 +10,7 @@ use Hyperf\Amqp\Message\ProducerMessage;
 /**
  * 转账
  */
-#[Producer(exchange: 'block', routingKey: 'transfer')]
+#[Producer(exchange: 'block.transfer', routingKey: 'block-transfer')]
 class BlockTransferProducer extends ProducerMessage
 {
     public function __construct($data)

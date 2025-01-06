@@ -10,7 +10,7 @@ use Hyperf\Amqp\Message\ProducerMessage;
 /**
  * 转账下注结算
  */
-#[Producer(exchange: 'block_transfer', routingKey: 'transfer_bet_settlement')]
+#[Producer(exchange: 'block.transfer.bet.settlement', routingKey: 'block-transfer-bet-settlement')]
 class BlockTransferBetSettlementProducer extends ProducerMessage
 {
     public function __construct($data)

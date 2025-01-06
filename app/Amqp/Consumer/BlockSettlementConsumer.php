@@ -14,7 +14,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block', routingKey: 'settlement', queue: 'block-settlement', name: "BlockSettlementConsumer", nums: 1)]
+#[Consumer(exchange: 'block.settlement', routingKey: 'block-settlement', queue: 'block-settlement', name: "BlockSettlementConsumer", nums: 1)]
 class BlockSettlementConsumer extends ConsumerMessage
 {
     #[Inject]

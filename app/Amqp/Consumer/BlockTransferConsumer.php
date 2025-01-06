@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Amqp\Consumer;
 
 use App\Service\BlockApi\BlockApiService;
-use App\Service\BlockApi\TronNodeService;
+use Hyperf\Amqp\Message\Type;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
 use Hyperf\Amqp\Message\ConsumerMessage;
@@ -13,11 +13,13 @@ use Hyperf\Di\Annotation\Inject;
 use PhpAmqpLib\Message\AMQPMessage;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block', routingKey: 'transfer', queue: 'block-transfer', name: "BlockTransferConsumer", nums: 2)]
+#[Consumer(exchange: 'block.transfer', routingKey: 'block-transfer', queue: 'block-transfer', name: "BlockTransferConsumer", nums: 2)]
 class BlockTransferConsumer extends ConsumerMessage
 {
     #[Inject]
     protected LoggerInterface $logger;
+
+    protected Type|string $type = Type::DIRECT; //Type::FANOUT;
 
     protected ?array $qos = [
         'prefetch_size' => 0,

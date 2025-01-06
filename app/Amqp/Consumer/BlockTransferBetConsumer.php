@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Amqp\Consumer;
 
-use App\Service\BlockApi\BlockApiService;
 use App\Service\BlockApi\WebHookService;
-use App\Service\BlockGamePeriodsService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
 use Hyperf\Amqp\Message\ConsumerMessage;
@@ -15,7 +13,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block_transfer', routingKey: 'transfer_bet', queue: 'block-transfer-bet', name: "BlockTransferBetConsumer", nums: 2)]
+#[Consumer(exchange: 'block.transfer.bet', routingKey: 'block-transfer-bet', queue: 'block-transfer-bet', name: "BlockTransferBetConsumer", nums: 2)]
 class BlockTransferBetConsumer extends ConsumerMessage
 {
     #[Inject]
