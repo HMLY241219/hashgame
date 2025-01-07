@@ -44,8 +44,6 @@ startServer() {
 cd /www/server/panel/pyenv/bin/
 # 启动服务1
 startServer $port1 $serverId1
-# 睡眠3秒
-sleep 3s
 # 启动服务2
 startServer $port2 $serverId2
 
