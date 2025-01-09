@@ -664,14 +664,13 @@ class BlockGamePeriodsService extends BaseService
     public static function computeOpenResultHashDX(string $blockHash): array
     {
         $char = substr(filter_var($blockHash, FILTER_SANITIZE_NUMBER_INT), -1);
-        if (in_array($char, ['0', '1', '2', '3', '4'])) {
-            $res = 1; // 小
+        if (in_array($char, ['5', '6', '7', '8', '9'])) {
+            $res = 1; // 大
         } else {
-            $res = 2; // 大
+            $res = 2; // 小
         }
         return ['result' => $res, 'data' => [$char]];
     }
-
 
     /**
      * 计算开奖结果（hash单双）
