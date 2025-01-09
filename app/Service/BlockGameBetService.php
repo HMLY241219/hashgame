@@ -1043,10 +1043,10 @@ class BlockGameBetService extends BaseService
      */
     public static function computeBetAreaHashHZDX(int $betAmount): int
     {
-        if (in_array(intval($betAmount) % 10, [0, 1, 2, 3, 4])) {
-            $betArea = 1; // 小
+        if (in_array(intval($betAmount) % 10, [5, 6, 7, 8, 9])) {
+            $betArea = 1; // 大
         } else {
-            $betArea = 2; // 大
+            $betArea = 2; // 小
         }
         return $betArea;
     }

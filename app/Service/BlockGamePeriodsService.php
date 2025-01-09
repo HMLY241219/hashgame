@@ -785,10 +785,10 @@ class BlockGamePeriodsService extends BaseService
         $char1 = (int)substr(filter_var($blockHash, FILTER_SANITIZE_NUMBER_INT), -1);
         $char2 = (int)substr($blockNumber, -1);
         $char = ($char1 + $char2) % 10;
-        if (in_array($char, [0, 1, 2, 3, 4])) {
-            $res = 1; // 小
+        if (in_array($char, [5, 6, 7, 8, 9])) {
+            $res = 1; // 大
         } else {
-            $res = 2; // 大
+            $res = 2; // 小
         }
         return ['result' => $res, 'data' => [$char]];
     }
