@@ -84,14 +84,16 @@ class BaseService
      * @param array $params 存储数据
      * @param int $expire 过期时间
      * @param string $pool 连接池
+     * @param int $dbIndex 数据库索引
      * @return void
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setCache(string $hTbName, array $params, int $expire = 0, string $pool = 'default'): void
+    public static function setCache(string $hTbName, array $params, int $expire = 0, string $pool = 'default', int $dbIndex = 0): void
     {
         $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
         $cache->hMSet($hTbName, $params);
         if ($expire > 0) {
             $cache->expire($hTbName, $expire);
@@ -105,14 +107,16 @@ class BaseService
      * @param $value
      * @param int $expire
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return void
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setFieldCache(string $hTbName, string $field, $value, int $expire = 0, string $pool = 'default'): void
+    public static function setFieldCache(string $hTbName, string $field, $value, int $expire = 0, string $pool = 'default', int $dbIndex = 0): void
     {
         $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
         $cache->hSet($hTbName, $field, $value);
         if ($expire > 0) {
             $cache->expire($hTbName, $expire);
@@ -123,14 +127,15 @@ class BaseService
      * 获取缓存
      * @param string $hTbName hash表名
      * @param string $pool 连接池
+     * @param int $dbIndex 数据库索引
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getCache(string $hTbName, string $pool = 'default'): array|bool|\Redis
+    public static function getCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->hGetAll($hTbName);
+        return Common::Redis($pool)->select($dbIndex)->hGetAll($hTbName);
     }
 
     /**
@@ -138,14 +143,15 @@ class BaseService
      * @param string $hTbName
      * @param string $field
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getFieldCache(string $hTbName, string $field, string $pool = 'default'): array|bool|\Redis
+    public static function getFieldCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->hGet($hTbName, $field);
+        return Common::Redis($pool)->select($dbIndex)->hGet($hTbName, $field);
     }
 
     /**
@@ -153,14 +159,15 @@ class BaseService
      * @param string $lockName
      * @param int $expire
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setCacheLock(string $lockName, int $expire = 5, string $pool = 'default'): array|bool|\Redis
+    public static function setCacheLock(string $lockName, int $expire = 5, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->set($lockName, 1, ['nx', 'ex' => $expire]);
+        return Common::Redis($pool)->select($dbIndex)->set($lockName, 1, ['nx', 'ex' => $expire]);
     }
 
     /**
@@ -168,41 +175,44 @@ class BaseService
      * @param int $cursor
      * @param string $prefix
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      */
-    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'default'): array|bool|\Redis
+    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->scan($cursor, $prefix, 20);
+        return Common::Redis($pool)->select($dbIndex)->scan($cursor, $prefix, 20);
     }
 
     /**
      * 获取匹配的缓存键值
      * @param string $prefix
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return array|bool|\Redis
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getCacheKeys(string $prefix = '*', string $pool = 'default'): array|bool|\Redis
+    public static function getCacheKeys(string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->keys($prefix);
+        return Common::Redis($pool)->select($dbIndex)->keys($prefix);
     }
 
     /**
      * 删除缓存
      * @param string $hTbName
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return void
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function delCache(string $hTbName, string $pool = 'default'): void
+    public static function delCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): void
     {
-        Common::Redis($pool)->del($hTbName);
+        Common::Redis($pool)->select($dbIndex)->del($hTbName);
     }
 
     /**
@@ -210,14 +220,15 @@ class BaseService
      * @param string $hTbName
      * @param string $field
      * @param string $pool
+     * @param int $dbIndex 数据库索引
      * @return void
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function hDelCache(string $hTbName, string $field, string $pool = 'default'): void
+    public static function hDelCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): void
     {
-        Common::Redis($pool)->hDel($hTbName, $field);
+        Common::Redis($pool)->select($dbIndex)->hDel($hTbName, $field);
     }
 
     /**
