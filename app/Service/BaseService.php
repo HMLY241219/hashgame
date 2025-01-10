@@ -135,7 +135,9 @@ class BaseService
      */
     public static function getCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->select($dbIndex)->hGetAll($hTbName);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->hGetAll($hTbName);
     }
 
     /**
@@ -151,7 +153,9 @@ class BaseService
      */
     public static function getFieldCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->select($dbIndex)->hGet($hTbName, $field);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->hGet($hTbName, $field);
     }
 
     /**
@@ -167,7 +171,9 @@ class BaseService
      */
     public static function setCacheLock(string $lockName, int $expire = 5, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->select($dbIndex)->set($lockName, 1, ['nx', 'ex' => $expire]);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->set($lockName, 1, ['nx', 'ex' => $expire]);
     }
 
     /**
@@ -182,7 +188,9 @@ class BaseService
      */
     public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->select($dbIndex)->scan($cursor, $prefix, 20);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->scan($cursor, $prefix, 20);
     }
 
     /**
@@ -197,7 +205,9 @@ class BaseService
      */
     public static function getCacheKeys(string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
     {
-        return Common::Redis($pool)->select($dbIndex)->keys($prefix);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->keys($prefix);
     }
 
     /**
@@ -212,7 +222,9 @@ class BaseService
      */
     public static function delCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): void
     {
-        Common::Redis($pool)->select($dbIndex)->del($hTbName);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        $cache->del($hTbName);
     }
 
     /**
@@ -228,7 +240,9 @@ class BaseService
      */
     public static function hDelCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): void
     {
-        Common::Redis($pool)->select($dbIndex)->hDel($hTbName, $field);
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        $cache->hDel($hTbName, $field);
     }
 
     /**
