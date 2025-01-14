@@ -121,14 +121,18 @@ class Common
     /**
      * 获取单个参数配置
      * @param $menu
+     * @param int $type 1=返回数组，2=直接返回
      * @return
      */
-    public static function getConfigValue($menu)
+    public static function getConfigValue($menu,int $type = 1)
     {
-        $system_config = Db::connection('readConfig')->table('system_config')->select('value')->where('menu_name',$menu)->first();
-        if(!$system_config)return '';
-        return json_decode($system_config['value'], true);
+        $Redis = self::Redis('RedisMy6379_2');
+        $value = $Redis->hGet('system_config',$menu);
+        if(!$value)$value = self::getAndsetConfigValue($Redis,$menu);
+        if(!$value)return '';
+        return json_decode($value, true);
     }
+
 
     /**
      * 获得多个参数
@@ -138,11 +142,29 @@ class Common
     public static function getMore($menus)
     {
         $menus = is_array($menus) ? $menus : explode(',',$menus);
-        $list = Db::connection('readConfig')->table('system_config')->whereIn('menu_name',$menus)->pluck('value','menu_name');
+        $Redis = self::Redis('RedisMy6379_2');
+        $redisList = $Redis->hMGet('system_config',$menus);
+        $list = [];
+        if(!$redisList){
+            $system_config = Db::connection('readConfig')->table('system_config')->whereIn('menu_name',$menus)->pluck('value','menu_name');
+            if(!$system_config)foreach ($menus as $menu) $system_config[$menu] = '';
+            $Redis->hMSet('system_config',$menus);
+        }else{
+            foreach ($menus as  $menu)$list[$menu] = isset($redisList[$menu]) ? json_decode($redisList[$menu], true) : self::getAndsetConfigValue($Redis,$menu);
+        }
+
         foreach ($list as $menu => $value) {
             $list[$menu] = json_decode($value, true);
         }
         return $list;
+    }
+
+
+    private static function getAndsetConfigValue($Redis,$menu){
+        $system_config = Db::connection('readConfig')->table('system_config')->select('value')->where('menu_name',$menu)->first();
+        if(!$system_config)return '';
+        $Redis->hSet('system_config',$menu,$system_config['value']);
+        return $system_config['value'];
     }
 
     /** 第三方储存log
