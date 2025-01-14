@@ -139,7 +139,7 @@ class OrderActiveController extends AbstractController
         $userinfo = $data['userinfo'];
         $max_recharge_amount = $data['max_recharge_amount'];
 
-        $withdraw_money = Db::table('withdraw_log')->where('uid',$uid)->whereIn('status',[0,3,1])->sum('money');
+        $withdraw_money = Db::table('userinfo')->where('uid',$uid)->value('total_exchange');
         //退款比例
         $withdraw_bili = bcdiv((string)$withdraw_money,(string)$userinfo['total_pay_score'],2);  // 提现/ 充值
 
@@ -355,7 +355,7 @@ class OrderActiveController extends AbstractController
         $userinfo = $data['userinfo'];
         $max_recharge_amount = $data['max_recharge_amount'];
 
-        $withdraw_money = Db::table('withdraw_log')->where('uid',$uid)->whereIn('status',[0,3,1])->sum('money');
+        $withdraw_money = Db::table('userinfo')->where('uid',$uid)->value('total_exchange');
         //客损金额
         $customer_money = bcsub((string)$userinfo['total_pay_score'],bcadd((string)$withdraw_money,bcadd((string)$userinfo['coin'],(string)$userinfo['bonus'],0)),0); //客损金额  充值 - 提现 - 余额
         $withdraw_bili = bcdiv((string)$withdraw_money,(string)$userinfo['total_pay_score'],2);  // 提现/ 充值
