@@ -143,20 +143,34 @@ class Common
     {
         $menus = is_array($menus) ? $menus : explode(',',$menus);
         $Redis = self::Redis('RedisMy6379_2');
-        $redisList = $Redis->hMGet('system_config',$menus);
+        $redisOldList = $Redis->hMGet('system_config',$menus);
+        $redisList = self::getRedisList($redisOldList);
         $list = [];
         if(!$redisList){
             $system_config = Db::connection('readConfig')->table('system_config')->whereIn('menu_name',$menus)->pluck('value','menu_name');
             if(!$system_config)foreach ($menus as $menu) $system_config[$menu] = '';
-            $Redis->hMSet('system_config',$menus);
+            foreach ($system_config as $menu_name => $value){
+                $Redis->hSet('system_config',$menu_name,$value);
+                $list[$menu_name] = json_decode($value, true);
+            }
         }else{
             foreach ($menus as  $menu)$list[$menu] = isset($redisList[$menu]) ? json_decode($redisList[$menu], true) : self::getAndsetConfigValue($Redis,$menu);
         }
 
-        foreach ($list as $menu => $value) {
-            $list[$menu] = json_decode($value, true);
-        }
         return $list;
+    }
+
+    /**
+     * 整理redis的值
+     * @param array $list
+     * @return array
+     */
+    public static function getRedisList($list):array{
+        $data = [];
+        foreach ($list as $key => $value){
+            if($value)$data[$key] = $value;
+        }
+        return $data;
     }
 
 
