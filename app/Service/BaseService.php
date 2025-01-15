@@ -79,6 +79,35 @@ class BaseService
     }
 
     /**
+     * 获取批量更新sql
+     * @param string $tbName
+     * @param array $data
+     * @param string $pkField
+     * @return string
+     */
+    public static function getBatchUpdateSql(string $tbName, array $data, string $pkField): string
+    {
+        if (empty($data)) return '';
+
+        $sql = "UPDATE {$tbName} SET ";
+        $setFields = [];
+        $fieldArr = array_keys($data[0]);
+        unset($fieldArr[array_search($pkField, $fieldArr)]); // 过滤主键
+        foreach ($fieldArr as $field) {
+            $sqlTmp = "{$field} = CASE {$pkField} ";
+            foreach ($data as $item) {
+                $sqlTmp .= sprintf(" WHEN %s THEN '%s'", $item[$pkField], $item[$field]);
+            }
+            $sqlTmp .= " END";
+            $setFields[] = $sqlTmp;
+        }
+        $ids = implode(',', array_column($data, $pkField));
+        $sql .= implode(',', $setFields) . " WHERE {$pkField} IN ({$ids})";
+
+        return $sql;
+    }
+
+    /**
      * 设置缓存
      * @param string $hTbName hash表名
      * @param array $params 存储数据
