@@ -121,14 +121,18 @@ class Common
     /**
      * 获取单个参数配置
      * @param $menu
+     * @param int $type 1=返回数组，2=直接返回
      * @return
      */
-    public static function getConfigValue($menu)
+    public static function getConfigValue($menu,int $type = 1)
     {
-        $system_config = Db::connection('readConfig')->table('system_config')->select('value')->where('menu_name',$menu)->first();
-        if(!$system_config)return '';
-        return json_decode($system_config['value'], true);
+        $Redis = self::Redis('RedisMy6379_2');
+        $value = $Redis->hGet('system_config',$menu);
+        if(!$value)$value = self::getAndsetConfigValue($Redis,$menu);
+        if(!$value)return '';
+        return json_decode($value, true);
     }
+
 
     /**
      * 获得多个参数
@@ -138,11 +142,43 @@ class Common
     public static function getMore($menus)
     {
         $menus = is_array($menus) ? $menus : explode(',',$menus);
-        $list = Db::connection('readConfig')->table('system_config')->whereIn('menu_name',$menus)->pluck('value','menu_name');
-        foreach ($list as $menu => $value) {
-            $list[$menu] = json_decode($value, true);
+        $Redis = self::Redis('RedisMy6379_2');
+        $redisOldList = $Redis->hMGet('system_config',$menus);
+        $redisList = self::getRedisList($redisOldList);
+        $list = [];
+        if(!$redisList){
+            $system_config = Db::connection('readConfig')->table('system_config')->whereIn('menu_name',$menus)->pluck('value','menu_name');
+            if(!$system_config)foreach ($menus as $menu) $system_config[$menu] = '';
+            foreach ($system_config as $menu_name => $value){
+                $Redis->hSet('system_config',$menu_name,$value);
+                $list[$menu_name] = json_decode($value, true);
+            }
+        }else{
+            foreach ($menus as  $menu)$list[$menu] = isset($redisList[$menu]) ? json_decode($redisList[$menu], true) : self::getAndsetConfigValue($Redis,$menu);
         }
+
         return $list;
+    }
+
+    /**
+     * 整理redis的值
+     * @param array $list
+     * @return array
+     */
+    public static function getRedisList($list):array{
+        $data = [];
+        foreach ($list as $key => $value){
+            if($value)$data[$key] = $value;
+        }
+        return $data;
+    }
+
+
+    private static function getAndsetConfigValue($Redis,$menu){
+        $system_config = Db::connection('readConfig')->table('system_config')->select('value')->where('menu_name',$menu)->first();
+        if(!$system_config)return '';
+        $Redis->hSet('system_config',$menu,$system_config['value']);
+        return $system_config['value'];
     }
 
     /** 第三方储存log

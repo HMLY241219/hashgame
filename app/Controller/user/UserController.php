@@ -202,8 +202,8 @@ class UserController extends AbstractController {
      * @return mixed
      */
     public static function getUserWithStatus($uid){
-        $money = Db::table('withdraw_log')->where([['uid','=',$uid]])->whereIn('status',[0,1,3])->value('money');
-        return $money ?: 0;
+        $total_exchange = Db::table('userinfo')->where('uid',$uid)->value('total_exchange');
+        return $total_exchange ?: 0;
     }
 
 }

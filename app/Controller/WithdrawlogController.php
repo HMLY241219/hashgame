@@ -177,7 +177,7 @@ class WithdrawlogController extends AbstractController {
 
         $withCreatetime = Db::table('withdraw_log')->where([['uid','=',$uid]])->whereIn('status',[0,3,1])->orderBy('createtime','desc')->value('createtime');
 
-        $withCount = Db::table('withdraw_log')->where([['uid','=',$uid]])->whereIn('status',[0,3,1])->count();
+        $withCount = Db::table('userinfo')->where([['uid','=',$uid]])->value('total_exchange_num');
 
 
         $paymentWhere = '';
@@ -299,7 +299,7 @@ class WithdrawlogController extends AbstractController {
             br_a.total_pay_score,br_a.total_give_score,br_a.total_exchange,br_a.package_id,br_a.channel,br_a.withdraw_money,
             br_b.phone,br_b.email,br_b.af_status,br_b.city,(br_a.total_cash_water_score + br_a.total_bonus_water_score) as total_water_score,
             br_b.jiaphone,br_b.jiaemail,br_b.jianame,br_b.tag,br_a.now_cash_score_water,br_a.need_cash_score_water,br_a.withdraw_money_other,
-            br_a.vip,br_b.createtime,br_b.is_brushgang')
+            br_a.vip,br_b.createtime,br_b.is_brushgang,br_a.total_exchange_num,br_b.puid')
             ->where('a.uid',$uid)
             ->first();
 
@@ -345,9 +345,8 @@ class WithdrawlogController extends AbstractController {
         if(($userinfo['need_cash_score_water'] <= 0 || $userinfo['now_cash_score_water'] < $userinfo['need_cash_score_water']) && $userinfo['withdraw_money_other'] < $money)return $this->ReturnJson->failFul(241);
 
 
-        $withdraw_log_money = Db::table('withdraw_log')->where([['uid','=',$uid]])->whereIn('status',[0,3])->sum('money');
         //用户总退款金额
-        $new_total_exchange = bcadd((string)$userinfo['total_exchange'],(string)$withdraw_log_money,0);
+        $new_total_exchange = (string)$userinfo['total_exchange'];
 
         //获取用户退款最大额度
         $withdraw_multiple = Common::getConfigValue("withdraw_multiple");
@@ -383,15 +382,17 @@ class WithdrawlogController extends AbstractController {
 
 
         //获取用户今日退款的金额
-        $user_withdraw_log = Db::table('withdraw_log')->select('money')->where([['uid','=',$uid],['createtime','>=',strtotime('00:00:00')]])->whereNotIn('status',[-1,2])->get()->toArray();
+        $user_day_withdraw_log = Db::table('user_day_'.date('Ymd'))->selectRaw('total_exchange,total_exchange_num')->where('uid',$uid)->first();
 
 
-        $day_with_moeny = '0';//用户今日提现金额
-        $day_withdraw_num = 0;//用户今日提现次数
-        if($user_withdraw_log)foreach ($user_withdraw_log as $val){
-            $day_withdraw_num = $day_withdraw_num + 1;
-            $day_with_moeny = bcadd($day_with_moeny,(string)$val['money'],0);
+        if($user_day_withdraw_log){
+            $day_with_moeny = (string)$user_day_withdraw_log['total_exchange'];//用户今日提现金额
+            $day_withdraw_num = $user_day_withdraw_log['total_exchange_num'];//用户今日提现次数
+        }else{
+            $day_with_moeny = '0';//用户今日提现金额
+            $day_withdraw_num = 0;//用户今日提现次数
         }
+
 
         //判断每日退款次数是否已到达上线
         $withdraw_vip = Db::table('vip')->select('day_withdraw_money','day_withdraw_num','order_pay_money','withdraw_max_money')->where('vip',$userinfo['vip'])->first();
@@ -403,18 +404,18 @@ class WithdrawlogController extends AbstractController {
 
         }
 
-        $vip_log = Db::table('vip_log')->select('createtime')->where(['uid' => $uid,'vip' => $userinfo['vip'],'type' => 1])->first();
-        if(!$vip_log)$vip_log['createtime'] = $userinfo['createtime'];
-        //Vip升级之后的退款金额
-        $vip_level_money = Db::table('withdraw_log')->where([['uid','=',$uid],['createtime','>=',$vip_log['createtime']]])->whereIn('status',[0,3,1])->sum('money');
-        $vip_level_money = $vip_level_money ?: 0;
-        //近30天充值
-        // $vip_pay_money = Db::table('order')->where([['uid','=',$uid],['pay_status','=',1],['createtime','>=',strtotime('-30 day')]])->sum('price');
-        // $vip_pay_money = $vip_pay_money ?: 0;
-
-        if(($withdraw_vip['withdraw_max_money'] && bcadd((string)$money,(string)$vip_level_money,0) > $withdraw_vip['withdraw_max_money'])){
-            return $this->ReturnJson->failFul(272);
-        }
+//        $vip_log = Db::table('vip_log')->select('createtime')->where(['uid' => $uid,'vip' => $userinfo['vip'],'type' => 1])->first();
+//        if(!$vip_log)$vip_log['createtime'] = $userinfo['createtime'];
+//        //Vip升级之后的退款金额
+//        $vip_level_money = Db::table('withdraw_log')->where([['uid','=',$uid],['createtime','>=',$vip_log['createtime']]])->whereIn('status',[0,3,1])->sum('money');
+//        $vip_level_money = $vip_level_money ?: 0;
+//        //近30天充值
+//        // $vip_pay_money = Db::table('order')->where([['uid','=',$uid],['pay_status','=',1],['createtime','>=',strtotime('-30 day')]])->sum('price');
+//        // $vip_pay_money = $vip_pay_money ?: 0;
+//
+//        if(($withdraw_vip['withdraw_max_money'] && bcadd((string)$money,(string)$vip_level_money,0) > $withdraw_vip['withdraw_max_money'])){
+//            return $this->ReturnJson->failFul(272);
+//        }
 
         //关联用户数据
         $gl_data = $this->getGlDataArray($uid);
@@ -502,7 +503,8 @@ class WithdrawlogController extends AbstractController {
             //     //风控订单发送审核信息
             //     \service\TelegramService::withdrawRisk($data);
             // }
-
+            $userinfo['uid'] = $uid;
+            $this->setUserWithdrawLogInfo($userinfo,(int)$money);
             return $this->ReturnJson->successFul();
         }
         $data['jianame'] = $userinfo['jianame'];
@@ -513,7 +515,9 @@ class WithdrawlogController extends AbstractController {
         $res = Db::table('withdraw_log')->where('id','=',$withdraw_log_id)->update(['platform_id'=> $apInfo['data'],'updatetime' => time()]);
 
         if(!$res) return $this->ReturnJson->failFul(246);
-
+        //(迁移)
+        $userinfo['uid'] = $uid;
+        $this->setUserWithdrawLogInfo($userinfo,(int)$money);
 
 
 //        return json(['code' => 200 ,'msg'=>'success','data' =>[] ]);
@@ -741,7 +745,9 @@ class WithdrawlogController extends AbstractController {
      * @return void
      */
     public function getUserDayTotalExchangeMoney(int $uid){
-        return Db::table('withdraw_log')->where([['uid','=',$uid],['status','in',[0,3,1]],['createtime','>=',strtotime('00:00:00')]])->sum('money');
+        //(迁移)
+        $total_exchange = Db::table('user_day_'.date('Ymd'))->where('uid',$uid)->value('total_exchange');
+        return $total_exchange ?: 0;
     }
 
 
@@ -844,7 +850,9 @@ class WithdrawlogController extends AbstractController {
      * @return void
      */
     public static function getUserTotalExchangeMoney($uid){
-        return Db::table('withdraw_log')->where([['uid','=',$uid]])->whereIn('status',[0,3,1])->sum('money');
+        //(迁移)
+        $total_exchange = Db::table('userinfo')->where('uid',$uid)->value('total_exchange');
+        return $total_exchange ?: 0;
     }
 
 
@@ -892,6 +900,61 @@ class WithdrawlogController extends AbstractController {
 
 
     }
+
+
+
+    /**
+     * 处理退款用户信息
+     * @param $userinfo
+     * @param int $money
+     * @param  $daySuffix
+     * @return void
+     */
+    private function setUserWithdrawLogInfo($userinfo,int $money,$daySuffix = ''){
+        if($money == 0)return;
+        $user_day =  [
+            'uid' => $userinfo['uid'].'|up',
+            'puid' => $userinfo['puid'].'|up',
+            'vip' => $userinfo['vip'].'|up',
+            'channel' => $userinfo['channel'].'|up',
+            'package_id' => $userinfo['package_id'].'|up',
+            'total_exchange' => $money.'|raw-+',
+            'total_exchange_num' => ($money > 0 ? 1 : -1).'|raw-+',
+        ];
+        //user_day表处理
+        $user_day = new SqlModel($user_day,$daySuffix);
+        $user_day->userDayDealWith();
+
+
+        if($userinfo['total_exchange'] <= 0){ //第一次退款成功
+            if($money < 0)return ;
+            Db::table('userinfo')->where('uid',$userinfo['uid'])
+                ->update([
+                    'total_exchange' => Db::raw('total_exchange + '.$money),
+                    'total_exchange_num' => Db::raw('total_exchange_num + 1'),
+                    'first_withdraw_time' => time(),
+                    'updatetime' => time(),
+                ]);
+        }elseif ($userinfo['total_exchange_num'] == 1 && $money < 0){ //如果已经有一次退款了,看第二次金额是否是退款失败
+            Db::table('userinfo')->where('uid',$userinfo['uid'])
+                ->update([
+                    'total_exchange' => Db::raw('total_exchange + '.$money),
+                    'total_exchange_num' => Db::raw('total_exchange_num - 1'),
+                    'first_withdraw_time' => 0,
+                    'updatetime' =>time(),
+                ]);
+        }else{
+            Db::table('userinfo')->where('uid',$userinfo['uid'])
+                ->update([
+                    'total_exchange' => Db::raw('total_exchange + '.$money),
+                    'total_exchange_num' => $money > 0 ? Db::raw('total_exchange_num + 1') : Db::raw('total_exchange_num - 1'),
+                    'updatetime' => time(),
+                ]);
+        }
+
+
+    }
+
 
 
     /**
@@ -2114,10 +2177,8 @@ class WithdrawlogController extends AbstractController {
             return ['code' => 200 ,'msg'=>'','data' => []];
         }
 
-        //发送邮件与短信
-//        $userInfoEP = Db::table('share_strlog')->select('phone','email')->where('uid',$withdraw_log['uid'])->first();
-
-
+        //(迁移)
+        $userinfo = Db::table('userinfo')->selectRaw('uid,puid,channel,package_id,vip,total_exchange,total_pay_score,regist_time,total_exchange_num')->where('uid',$withdraw_log['uid'])->first();
         if($status == 1){ //成功
             $res = Db::table('withdraw_log')->where('ordersn',$ordersn)->update(['finishtime' => time(),'status' => 1]);
 
@@ -2125,63 +2186,21 @@ class WithdrawlogController extends AbstractController {
                 return ['code' => 201 ,'msg'=>'提现状态修改失败1','data' => []];
             }
 
-            $userinfo = Db::table('userinfo')->selectRaw('uid,puid,channel,package_id,vip,total_exchange,total_pay_score,regist_time')->where('uid',$withdraw_log['uid'])->first();
 
             Db::beginTransaction();
 
-            $user_day =  [
-                'uid' => $withdraw_log['uid'].'|up',
-                'puid' => $userinfo['puid'].'|up',
-                'vip' => $userinfo['vip'].'|up',
-                'channel' => $userinfo['channel'].'|up',
-                'package_id' => $userinfo['package_id'].'|up',
-                'total_exchange' => $withdraw_log['money'].'|raw-+',
-                'total_exchange_num' => '1|raw-+',
-            ];
-
-            //user_day表处理
-            $user_day = new SqlModel($user_day);
-            $res = $user_day->userDayDealWith();
-            if(!$res){
-                Db::rollback();
-                return ['code' => 201 ,'msg'=>'user_day数据表处理失败','data' => []];
-            }
-
-            if($userinfo['total_exchange'] <= 0){
-                $res = Db::table('userinfo')->where('uid',$withdraw_log['uid'])
-                    ->update([
-                        'total_exchange' => Db::raw('total_exchange + '.$withdraw_log['money']),
-                        'total_exchange_num' => Db::raw('total_exchange_num + 1'),
-                        'first_withdraw_time' => time(),
-                        'updatetime' => time(),
-                    ]);
-            }else{
-                $res = Db::table('userinfo')->where('uid',$withdraw_log['uid'])
-                    ->update([
-                        'total_exchange' => Db::raw('total_exchange + '.$withdraw_log['money']),
-                        'total_exchange_num' => Db::raw('total_exchange_num + 1'),
-                        'updatetime' => time(),
-                    ]);
-            }
-
-
-            if(!$res){
-                Db::rollback();
-                return ['code' => 201 ,'msg'=>'修改用户的总提现金额失败','data' => []];
-            }
-
-
-            if($userinfo['total_exchange'] <= 0 && $userinfo['total_pay_score'] > 0)$this->statisticsRetainedWithdraw($userinfo['uid'],$userinfo['package_id'],$userinfo['channel']);
+            //(迁移)
+            if($userinfo['regist_time'] >= strtotime('2024-12-17 07:30:00') && $userinfo['total_exchange_num'] == 1 && $userinfo['total_pay_score'] > 0)$this->statisticsRetainedWithdraw($userinfo['uid'],$userinfo['package_id'],$userinfo['channel']);
 
             $this->setRoi($userinfo['regist_time'], $userinfo['package_id'], $userinfo['channel'], $withdraw_log['money'], $userinfo['uid']);
-            //发送邮件
-//            $email = $userInfoEP['email'] ?: $withdraw_log['email'];
-//            if($email) Sms::sendEmali($email,'','withdrawlog',$withdraw_log['backname'],[$withdraw_log['money'],$withdraw_log['bankaccount'],$ordersn]);
 
-//            $phone = $userInfoEP['phone'] ?: $withdraw_log['phone'];
-//            if($phone) Sms::sendSms($phone,'withdrawlog',[$withdraw_log['money'],'',$ordersn]);
-
-
+            $share_strlog = Db::table('share_strlog')
+                ->selectRaw('is_agent_user')
+                ->where('uid',$withdraw_log['uid'])->first();
+            //统计无限代用户数据
+            if($share_strlog['is_agent_user'] == 1)Common::agentTeamWeeklog($withdraw_log['uid'], $withdraw_log['money'], $withdraw_log['fee'], 2);
+            //到账发送消息
+            $s1 = date('Y-m-d',$withdraw_log['createtime']);
 
         }else{ //失败
             //修改订单状态
@@ -2192,15 +2211,21 @@ class WithdrawlogController extends AbstractController {
 
             Db::beginTransaction();
 
-            Db::table('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($data),'type'=>8,'createtime' => time()]);
+            Db::table('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($data,JSON_UNESCAPED_UNICODE),'type'=>8,'createtime' => time()]);
 
             //返回用户的提现金额  退款的reason
             User::userEditCoin($withdraw_log['uid'],$withdraw_log['money'],5, "玩家三方回调" . $withdraw_log['uid'] . "退还提现金额" . bcdiv((string)$withdraw_log['money'],'100',2),3,1,$withdraw_log['withdraw_money_other']);
 
+            //(迁移)
+            $this->setUserWithdrawLogInfo($userinfo,0 - $withdraw_log['money'],date('Ymd',$withdraw_log['createtime']));
+
             //将三方错误日志，存储到第三张表中,是查询速度快一点
             Db::table('withdraw_logcenter')->where('withdraw_id',$withdraw_log['id'])->update([
-                'log_error' => json_encode($data),
+                'log_error' => json_encode($data,JSON_UNESCAPED_UNICODE),
             ]);
+
+
+
 
         }
 
