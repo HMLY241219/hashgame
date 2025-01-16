@@ -52,7 +52,7 @@ class UserService extends BaseService
                 'bonus' => $item['bonus_change'],
             ];
         }
-        $sql = self::getBatchUpdateSql('userinfo', $saveData, 'uid');
+        $sql = self::getBatchUpdateSql('br_userinfo', $saveData, 'uid');
         if (!empty($sql)) {
             Db::update($sql);
         }
