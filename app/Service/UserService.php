@@ -48,8 +48,8 @@ class UserService extends BaseService
         foreach ($data as $item) {
             $saveData[] = [
                 'uid' => $item['uid'],
-                'coin' => $item['coin_change'],
-                'bonus' => $item['bonus_change'],
+                'coin' => ['coin', '+', $item['coin_change']],
+                'bonus' => ['bonus', '+', $item['bonus_change']],
             ];
         }
         $sql = self::getBatchUpdateSql('br_userinfo', $saveData, 'uid');

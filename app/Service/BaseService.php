@@ -96,7 +96,12 @@ class BaseService
         foreach ($fieldArr as $field) {
             $sqlTmp = "{$field} = CASE {$pkField} ";
             foreach ($data as $item) {
-                $sqlTmp .= sprintf(" WHEN %s THEN '%s'", $item[$pkField], $item[$field]);
+                if (is_array($item[$field])) {
+                    $sqlTmp .= sprintf(" WHEN %s THEN %s%s%d", $item[$pkField], $item[$field][0], $item[$field][1], $item[$field][2]);
+                } else {
+                    $sqlTmp .= sprintf(" WHEN %s THEN '%s'", $item[$pkField], $item[$field]);
+                }
+
             }
             $sqlTmp .= " END";
             $setFields[] = $sqlTmp;
