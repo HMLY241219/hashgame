@@ -990,7 +990,7 @@ class BlockGamePeriodsService extends BaseService
                     $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
                     $result['status'] = EnumType::BET_STATUS_REFUND;
                 } else {
-                    $result['win_lose_amount'.$bonus] = $betData['bet_amount'.$bonus]; // 输赢金额
+                    $result['win_lose_amount'.$bonus] = -$betData['bet_amount'.$bonus]; // 输赢金额
                     $result['is_win'] = EnumType::BET_IS_WIN_NO;
                 }
             }
