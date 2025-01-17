@@ -13,7 +13,7 @@ use Hyperf\Di\Annotation\Inject;
 use PhpAmqpLib\Message\AMQPMessage;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block.transfer', routingKey: 'block-transfer', queue: 'block-transfer', name: "BlockTransferConsumer", nums: 2)]
+#[Consumer(exchange: 'block.transfer', routingKey: 'block-transfer', queue: 'block-transfer', name: "BlockTransferConsumer", nums: 1)]
 class BlockTransferConsumer extends ConsumerMessage
 {
     #[Inject]
@@ -35,7 +35,7 @@ class BlockTransferConsumer extends ConsumerMessage
             return Result::ACK;
         } else {
             $this->logger->alert('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
-            return Result::DROP;
+            return Result::REQUEUE;
         }
     }
 }
