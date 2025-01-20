@@ -578,12 +578,14 @@ class BlockGamePeriodsService extends BaseService
             'network' => $network,
         ], true);
         // 游戏当期开奖数据
-        $gamePeriodsList = $gameRuleList = [];
+        $gamePeriodsList = $gameRuleList = $createdPeriodsIds = [];
         foreach ($gameList as $game) {
             // 获取开奖结果
             $openRes = self::getOpenResult($openBlock['block_hash'], (string)$openBlock['block_number'], $game['game_type_second']);
+            $periodsId = Common::createIdSn(5, 'P', 1, $createdPeriodsIds); // 生成游戏期数ID
+            $createdPeriodsIds[] = $periodsId; // 已生成的ID，防止生成重复ID
             $gamePeriodsList[$game['game_id']] = [
-                'periods_id' => Common::createIdSn(5, 'P'), // 游戏期数ID
+                'periods_id' => $periodsId,
                 'game_id' => $game['game_id'],
                 'game_name' => $game['game_name'],
                 'network' => $game['network'],
@@ -615,7 +617,7 @@ class BlockGamePeriodsService extends BaseService
             ];
         }
 
-        unset($gameList);
+        unset($gameList, $createdPeriodsIds);
         return [$gamePeriodsList, $gameRuleList];
     }
 
