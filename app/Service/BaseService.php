@@ -22,6 +22,7 @@ class BaseService
 
     // 缓存
     public static int $cacheExpire = 3600 * 24 * 7; // 缓存统一过期时间
+    public static int $cacheExpireOneDay = 86400; // 缓存一天
 
     // 金额精度
     protected static int $amountDecimal = 100;

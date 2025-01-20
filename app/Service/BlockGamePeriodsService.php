@@ -78,7 +78,7 @@ class BlockGamePeriodsService extends BaseService
 
             $list = $all ? $model->select($field)->get()->toArray() : $model->paginate(empty($params['page_size']) ? self::$pageSize : (int)$params['page_size'], $field)->toArray();
             // 数据缓存
-            self::setCache($hTbName, ['data' => json_encode($list)], self::$cacheExpire);
+            self::setCache($hTbName, ['data' => json_encode($list)], self::$cacheExpireOneDay);
         }
 
         if ($all) {
