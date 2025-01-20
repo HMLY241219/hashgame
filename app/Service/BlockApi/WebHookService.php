@@ -111,7 +111,7 @@ class WebHookService extends BaseService
         }
 
         // 缓存交易hash下注标识
-        self::setCache($hTbName, ['is_bet' => 1]);
+        self::setCache($hTbName, ['is_bet' => 1], self::$cacheExpire);
 
         return true;
     }
