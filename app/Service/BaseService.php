@@ -125,7 +125,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setCache(string $hTbName, array $params, int $expire = 0, string $pool = 'default', int $dbIndex = 0): void
+    public static function setCache(string $hTbName, array $params, int $expire = 0, string $pool = 'RedisMy6379', int $dbIndex = 4): void
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -148,7 +148,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setFieldCache(string $hTbName, string $field, $value, int $expire = 0, string $pool = 'default', int $dbIndex = 0): void
+    public static function setFieldCache(string $hTbName, string $field, $value, int $expire = 0, string $pool = 'RedisMy6379', int $dbIndex = 4): void
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -168,7 +168,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
+    public static function getCache(string $hTbName, string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -186,7 +186,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getFieldCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
+    public static function getFieldCache(string $hTbName, string $field, string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -204,7 +204,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function setCacheLock(string $lockName, int $expire = 5, string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
+    public static function setCacheLock(string $lockName, int $expire = 5, string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -221,7 +221,7 @@ class BaseService
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
      */
-    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
+    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -238,7 +238,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function getCacheKeys(string $prefix = '*', string $pool = 'default', int $dbIndex = 0): array|bool|\Redis
+    public static function getCacheKeys(string $prefix = '*', string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -255,7 +255,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function delCache(string $hTbName, string $pool = 'default', int $dbIndex = 0): void
+    public static function delCache(string $hTbName, string $pool = 'RedisMy6379', int $dbIndex = 4): void
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
@@ -273,7 +273,7 @@ class BaseService
      * @throws \Psr\Container\NotFoundExceptionInterface
      * @throws \RedisException
      */
-    public static function hDelCache(string $hTbName, string $field, string $pool = 'default', int $dbIndex = 0): void
+    public static function hDelCache(string $hTbName, string $field, string $pool = 'RedisMy6379', int $dbIndex = 4): void
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
