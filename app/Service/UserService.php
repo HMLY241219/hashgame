@@ -44,23 +44,17 @@ class UserService extends BaseService
      */
     public static function batchUpdateUserCoin(array $data): void
     {
-        $sqlArr = [];
-        foreach ($data as $v) {
-            $setField = '';
-            if ($v['coin_change'] > 0) {
-                $setField .= "coin = coin + {$v['coin_change']}";
-            }
-            if ($v['bonus_change'] > 0) {
-                $setField .= !empty($setField) ? ',' : '';
-                $setField .= "bonus = bonus + {$v['bonus_change']}";
-            }
-            if ($setField != '') {
-                $sqlArr[] = "UPDATE br_userinfo SET {$setField} WHERE uid = {$v['uid']}";
-            }
+        $saveData = [];
+        foreach ($data as $item) {
+            $saveData[] = [
+                'uid' => $item['uid'],
+                'coin' => ['coin', '+', $item['coin_change']],
+                'bonus' => ['bonus', '+', $item['bonus_change']],
+            ];
         }
-
-        if ($sqlArr) {
-            Db::update(implode(';', $sqlArr));
+        $sql = self::getBatchUpdateSql('br_userinfo', $saveData, 'uid');
+        if (!empty($sql)) {
+            Db::update($sql);
         }
     }
 

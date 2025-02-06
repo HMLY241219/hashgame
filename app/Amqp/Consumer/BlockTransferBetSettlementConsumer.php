@@ -13,7 +13,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block.transfer.bet.settlement', routingKey: 'block-transfer-bet-settlement', queue: 'block-transfer-bet-settlement', name: "BlockTransferBetSettlementConsumer", nums: 2)]
+#[Consumer(exchange: 'block.transfer.bet.settlement', routingKey: 'block-transfer-bet-settlement', queue: 'block-transfer-bet-settlement', name: "BlockTransferBetSettlementConsumer", nums: 1)]
 class BlockTransferBetSettlementConsumer extends ConsumerMessage
 {
     #[Inject]
@@ -33,9 +33,11 @@ class BlockTransferBetSettlementConsumer extends ConsumerMessage
         $res = BlockGamePeriodsService::periodsSettlementByTransfer($data['bet_cache_key']);
         if ($res === true) {
             return Result::ACK;
+        } elseif ($res === 0) {
+            return Result::DROP;
         } else {
             $this->logger->error('BlockTransferBetSettlementConsumer.Error.$data：' . var_export($data, true) );
-            return Result::DROP;
+            return Result::REQUEUE;
         }
     }
 }

@@ -307,13 +307,19 @@ class Common
      * @param int $upperOrLower 1大写、2小写
      * @return string
      */
-    public static function createIdSn(int $suffixLen = 5, string $prefix = '', int $upperOrLower = 1): string
+    public static function createIdSn(int $suffixLen = 5, string $prefix = '', int $upperOrLower = 1, array $existIds = []): string
     {
         $str = 'abcdefghijklmnopqrstuvwxyz0123456789';
         $code = date('ymdHis') . substr(microtime(), 2, 3);
         for ($i = 1; $i <= $suffixLen; $i++) {
             $code .= $str[mt_rand(0, strlen($str)-1)];
         }
+
+        // 防止生成重复ID
+        if ($existIds && in_array($code, $existIds)) {
+            return self::createIdSn($suffixLen, $prefix, $upperOrLower, $existIds);
+        }
+        unset($existIds);
 
         return $upperOrLower === 1 ? strtoupper($prefix . $code) : strtolower($prefix . $code);
     }

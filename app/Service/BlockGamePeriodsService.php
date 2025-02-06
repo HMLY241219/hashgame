@@ -78,7 +78,7 @@ class BlockGamePeriodsService extends BaseService
 
             $list = $all ? $model->select($field)->get()->toArray() : $model->paginate(empty($params['page_size']) ? self::$pageSize : (int)$params['page_size'], $field)->toArray();
             // 数据缓存
-            self::setCache($hTbName, ['data' => json_encode($list)], self::$cacheExpire);
+            self::setCache($hTbName, ['data' => json_encode($list)], self::$cacheExpireOneDay);
         }
 
         if ($all) {
@@ -578,12 +578,14 @@ class BlockGamePeriodsService extends BaseService
             'network' => $network,
         ], true);
         // 游戏当期开奖数据
-        $gamePeriodsList = $gameRuleList = [];
+        $gamePeriodsList = $gameRuleList = $createdPeriodsIds = [];
         foreach ($gameList as $game) {
             // 获取开奖结果
             $openRes = self::getOpenResult($openBlock['block_hash'], (string)$openBlock['block_number'], $game['game_type_second']);
+            $periodsId = Common::createIdSn(5, 'P', 1, $createdPeriodsIds); // 生成游戏期数ID
+            $createdPeriodsIds[] = $periodsId; // 已生成的ID，防止生成重复ID
             $gamePeriodsList[$game['game_id']] = [
-                'periods_id' => Common::createIdSn(5, 'P'), // 游戏期数ID
+                'periods_id' => $periodsId,
                 'game_id' => $game['game_id'],
                 'game_name' => $game['game_name'],
                 'network' => $game['network'],
@@ -615,7 +617,7 @@ class BlockGamePeriodsService extends BaseService
             ];
         }
 
-        unset($gameList);
+        unset($gameList, $createdPeriodsIds);
         return [$gamePeriodsList, $gameRuleList];
     }
 
@@ -910,6 +912,7 @@ class BlockGamePeriodsService extends BaseService
                 $sxFee = round($betData['bet_amount'.$bonus] * $rules['sxfee_refund_ratio']); // 退还手续费
                 $result['refund_amount'.$bonus] = $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] - $sxFee; // 退还和结算金额
                 $result['sxfee_amount'.$bonus] = $sxFee; // 手续费
+                $result['win_lose_amount'.$bonus] = -$sxFee; // 输赢金额
                 $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
                 $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
                 $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
@@ -984,11 +987,12 @@ class BlockGamePeriodsService extends BaseService
                     $result['refund_amount'.$bonus] = $result['settlement_amount'.$bonus] = $betData['bet_amount'.$bonus] - $sxFee; // 退还和结算金额
                     $result['sxfee_ratio'] = $rules['sxfee_refund_ratio']; // 手续费率
                     $result['sxfee_amount'.$bonus] = $sxFee; // 手续费
+                    $result['win_lose_amount'.$bonus] = -$sxFee; // 输赢金额
                     $result['win_lose_ratio'] = $rules['loss_ratio']; // 输赢赔率
                     $result['is_win'] = EnumType::BET_IS_WIN_EQUAL;
                     $result['status'] = EnumType::BET_STATUS_REFUND;
                 } else {
-                    $result['win_lose_amount'.$bonus] = $betData['bet_amount'.$bonus]; // 输赢金额
+                    $result['win_lose_amount'.$bonus] = -$betData['bet_amount'.$bonus]; // 输赢金额
                     $result['is_win'] = EnumType::BET_IS_WIN_NO;
                 }
             }

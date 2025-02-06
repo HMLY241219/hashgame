@@ -13,7 +13,7 @@ use PhpAmqpLib\Message\AMQPMessage;
 use Hyperf\Amqp\Message\Type;
 use Psr\Log\LoggerInterface;
 
-#[Consumer(exchange: 'block.transfer.bet', routingKey: 'block-transfer-bet', queue: 'block-transfer-bet', name: "BlockTransferBetConsumer", nums: 2)]
+#[Consumer(exchange: 'block.transfer.bet', routingKey: 'block-transfer-bet', queue: 'block-transfer-bet', name: "BlockTransferBetConsumer", nums: 1)]
 class BlockTransferBetConsumer extends ConsumerMessage
 {
     #[Inject]
