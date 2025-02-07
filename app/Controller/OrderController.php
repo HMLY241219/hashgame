@@ -33,7 +33,8 @@ class OrderController extends AbstractController {
     public function principalSheetIndex(){
         $param = $this->request->all();
         $uid = $param['uid'];
-        $is_new = $this->request->post('is_new') ?? 0;
+
+
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
@@ -44,23 +45,19 @@ class OrderController extends AbstractController {
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $sysConfig = Common::getMore("order_min_money,bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num,is_upi_num_payment"); //最低充值金额
-        $data['order_min_money'] = $sysConfig['order_min_money'];
+
 
 
         $data['payment_type'] = []; //普通充值
-        $data['people_payment_type'] = []; //人工充值
         $payment_where = [];
-        if(!$is_new)$payment_where[] = ['type','<>',2];
-        //如果支付超过了次数，就不匹配UPI
-        if($sysConfig['is_upi_num_payment'] == 1 && $sysConfig['pay_before_num'] && $sysConfig['pay_before_num'] <= $userinfo['total_pay_num'])$payment_where[] = ['id','<>',1];
+
         $payment_type = Db::connection('readConfig')->table('payment_type')->select('id','name','image','type','url','zs_bili','protocol_ids','first_zs_bonus_bili','zs_bonus_bili')->where($payment_where)->where('status',1)->orderBy('weight','desc')->get()->toArray();
 
         //获取支付渠道
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
         $data['defaultNewMoney'] = $data['defaultMoney'];
-        $ArtificialService = $this->getArtificialService();
 
-        $wake_type = Db::connection('readConfig')->table('pay_type')->select('id')->where(['wake_status' => 1,'status' => 1])->first();
+
         $pay_type_array = [];
         if($sysConfig['withdraw_type_select'] == 3)$pay_type_array = Db::connection('readConfig')->table('pay_type')->selectRaw('id,icon,payment_ids')->where(['status' => 1])->orderBy('weight','desc')->get()->toArray();
         //数字货币协议
@@ -70,14 +67,8 @@ class OrderController extends AbstractController {
             //判断是否显示视频
             if($key == 0  && $data['payType'] && !in_array($v['id'],$this->showVideoUrlPaymentId))$data['payType']['video_url'] = '';
 
-            if($v['name'] == 'QRcode' && !$wake_type)continue;
             if($v['image'])$v['image'] = Common::domain_name_path((string)$v['image']);
-            if($v['type'] == 3){
-                $data['people_payment_type'][] = [
-                    'people_payment_type' => $v,
-                    'ArtificialService' => $ArtificialService[$v['id']] ?? []
-                ];
-            }elseif ($v['type'] == 2){
+            if ($v['type'] == 2){
                 $payment_type_array = explode(',',$v['protocol_ids']);
                 foreach ($digital_currency_protocol as $digital_currency){
                     if(in_array($digital_currency['id'],$payment_type_array)){
@@ -585,6 +576,32 @@ class OrderController extends AbstractController {
     }
 
     /**
+     * 客户端获取不同国家金额区间
+     * @param
+     *
+     */
+    #[RequestMapping(path:'getRechargeConfiguration')]
+    public function getRechargeConfiguration(){
+        $uid = $this->request->post('uid');
+        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
+        if(!$userinfo){
+            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
+        }
+
+        $this->getRechargeConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+    }
+
+
+    private function payFiatInfo($uid){
+        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
+        if(!$userinfo){
+            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
+        }
+        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+    }
+
+
+    /**
      * 获取充值金额与赠送Bonus 、Cash配置
      * @param $pt_pay_count  支付次数
      * @param $total_pay_score  总充值支付金额
@@ -592,19 +609,8 @@ class OrderController extends AbstractController {
      * @param $terminal_type  用户来源终端 2= H5 ，1=APP
      */
     private function getRechargeConfig($pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$bonus){
-
+        $currency = $this->request->post('currency') ?? 'VND';
         $user_type = \App\Controller\user\UserController::getUserType($uid); //获取用户类型
-
-        //判断走新包配置还是老包
-        $special_package_ids = Common::getConfigValue('special_package_ids');
-        $special_package_Array = $special_package_ids ? explode(',',$special_package_ids) : [];
-
-        if(in_array($package_id,$special_package_Array)){
-            $is_new_package_where = [['is_new_package','=',1]];
-        }else{
-            $is_new_package_where = [['is_new_package','=',0]];
-        }
-
         $withdraw_money = \App\Controller\WithdrawlogController::getUserTotalExchangeMoney($uid);  //用户提现的金额，包含待审核和处理中
         $withdraw_bili = $total_pay_score > 0 ? bcdiv((string)$withdraw_money,(string)$total_pay_score,2) : 0;  // 提现/ 充值
         $customer_money = bcsub((string)$total_pay_score,bcadd((string)$withdraw_money,bcadd((string)$coin,(string)$bonus,0)),0); //客损金额  充值 - 提现 - 余额
@@ -613,7 +619,7 @@ class OrderController extends AbstractController {
         $pt_pay_count_config = Common::getConfigValue('pt_pay_count') ?: 0;
 //        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0) && $this->getOrderIp((int)$uid)){  //首充充值商城判断  只能参加一次
         if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1])->where($is_new_package_where)->orderBy('weight','desc')->first();
+            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
             if($marketing_shop){
                 $defaultMoney = $marketing_shop['bonus_config'];
                 $cash_money = $marketing_shop['cash_config'];
@@ -625,7 +631,7 @@ class OrderController extends AbstractController {
             $customer_where = [];
             foreach ([7,20] as $val) if(!in_array($val,$type_array)) $customer_where[] = $val;
 
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where($is_new_package_where)->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1]])->orderBy('customer_money','desc')->first();
+            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1],['currency','=', $currency]])->orderBy('customer_money','desc')->first();
             if($marketing_shop){
                 $defaultMoney = $marketing_shop['bonus_config'];
                 $cash_money = $marketing_shop['cash_config'];
@@ -634,7 +640,7 @@ class OrderController extends AbstractController {
             }
         }
         if(!isset($defaultMoney) && $total_pay_score){  //破产
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where($is_new_package_where)->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)]])->orderBy('weight','desc')->first();
+            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)],['currency','=', $currency]])->orderBy('weight','desc')->first();
             if($marketing_shop && Db::table('shop_log')->where([['uid','=',$uid],['type','=',6]])->count() < $marketing_shop['num']){
                 $defaultMoney = $marketing_shop['bonus_config'];
                 $cash_money = $marketing_shop['cash_config'];
@@ -647,7 +653,7 @@ class OrderController extends AbstractController {
 
 
         if(!isset($defaultMoney)){
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where($is_new_package_where)->where([['status','=',1],['type','=',0],['user_type','=',$user_type]])->orderBy('weight','desc')->first();
+            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where([['status','=',1],['type','=',0],['user_type','=',$user_type],['currency','=', $currency]])->orderBy('weight','desc')->first();
             $defaultMoney = $marketing_shop['bonus_config'];
             $cash_money = $marketing_shop['cash_config'];
             $hot_config = $marketing_shop['hot_config'];
