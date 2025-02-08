@@ -9,6 +9,7 @@ use Hyperf\Di\Annotation\Inject;
 use App\Common\User;
 use Hyperf\HttpServer\Annotation\Controller;
 use Hyperf\HttpServer\Annotation\RequestMapping;
+use App\Service\PayService;
 use function Hyperf\Config\config;
 use function Hyperf\Coroutine\co;
 
@@ -22,6 +23,8 @@ class OrderController extends AbstractController {
     protected User $user;
     #[Inject]
     protected AdjustController $adjust;
+    #[Inject]
+    protected PayService $PayService;
     private array $fbPointPackageID = [1,7,11,12,14,15];  //FB打点的包
     private array $adjustPointPackageID = [1,13,11,14,15,12]; //Adjust打点的包
     private array $notAllPackageId = [40,49]; //所有通道匹配，排除的通道支付ID(这里ID必须是String)
@@ -40,28 +43,27 @@ class OrderController extends AbstractController {
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
 
+        $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
+
         $data['total_pay_num'] = $userinfo['total_pay_num'];
         //快捷的提现金额
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
-        $sysConfig = Common::getMore("order_min_money,bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num,is_upi_num_payment"); //最低充值金额
+        $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num"); //最低充值金额
 
 
 
         $data['payment_type'] = []; //普通充值
-        $payment_where = [];
 
-        $payment_type = Db::connection('readConfig')->table('payment_type')->select('id','name','image','type','url','zs_bili','protocol_ids','first_zs_bonus_bili','zs_bonus_bili')->where($payment_where)->where('status',1)->orderBy('weight','desc')->get()->toArray();
+        $payment_type = Db::connection('readConfig')->table('payment_type')->select('id','name','image','type','url','zs_bili','protocol_ids','first_zs_bonus_bili','zs_bonus_bili')->where('status',1)->orderBy('weight','desc')->get()->toArray();
 
         //获取支付渠道
-        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
+
         $data['defaultNewMoney'] = $data['defaultMoney'];
 
 
-        $pay_type_array = [];
-        if($sysConfig['withdraw_type_select'] == 3)$pay_type_array = Db::connection('readConfig')->table('pay_type')->selectRaw('id,icon,payment_ids')->where(['status' => 1])->orderBy('weight','desc')->get()->toArray();
         //数字货币协议
-        $digital_currency_protocol = Db::connection('readConfig')->table('digital_currency_protocol')->selectRaw('id,englishname,icon,name,min_money,max_money')->get()->toArray();
+        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
 
         foreach($payment_type as $key => $v){
             //判断是否显示视频
@@ -81,15 +83,7 @@ class OrderController extends AbstractController {
                 $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
                 $data['payment_type'][] = $v;
             }else{
-                if($sysConfig['withdraw_type_select'] == 3){
-                    $special_pay_types = explode(',',$sysConfig['special_pay_types']);
-                    foreach ($pay_type_array as $l){
-                        if(in_array($v['id'],$special_pay_types) && (!$l['payment_ids'] || in_array($v['id'],explode(',',$l['payment_ids'])))){
-                            if($l['icon'])$l['icon'] = Common::domain_name_path((string)$l['icon']);
-                            $v['pay_type_array'][] = $l;
-                        }
-                    }
-                }
+
                 $v['zs_bili'] = $this->getPaymentKhdTageSendBili($data['total_pay_num'],$v['zs_bili']);
                 $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
                 $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
@@ -99,11 +93,6 @@ class OrderController extends AbstractController {
 
 
 
-//        $dayTime = strtotime("00:00:00");
-//        $day_suc_order_count = Db::table('order')->where([['pay_status','=',1],['createtime','>=',$dayTime],['createtime','<',($dayTime + 86400)]])->count();
-//        $day_order_count = Db::table('order')->where([['createtime','>=',$dayTime],['createtime','<',($dayTime + 86400)]])->count();
-//        $day_suc_bili = $day_order_count > 0 ?  bcdiv((string)$day_suc_order_count,(string)$day_order_count,2) : 0;
-//        if($sysConfig['below_the_pop_prompt'] && $day_order_count && $day_suc_bili < $sysConfig['below_the_pop_prompt']) $data['payment_reminder_status'] = 1;
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
         $data['cash_pay_water_multiple'] =  $sysConfig['cash_pay_water_multiple'];
@@ -217,18 +206,15 @@ class OrderController extends AbstractController {
         $uid = $this->request->post('uid');
         $userCreatetime = Db::table('share_strlog')->where('uid',$uid)->value('createtime');
         if(!$userCreatetime)return $this->ReturnJson->failFul();
-        $ydNum = Db::table('order')->where(['uid' => $uid,'pay_status' => 1,'is_point' => 1])->count();
-        $order = Db::table('order')->select('ordersn','price','createtime')->where(['uid' => $uid,'pay_status' => 1,'is_point' => 0])->orderBy('createtime')->get()->toArray();
+        $order = Db::table('order')->select('ordersn','price','createtime','is_first')->where(['uid' => $uid,'pay_status' => 1,'is_point' => 0])->orderBy('createtime')->get()->toArray();
         if($order) foreach ($order as &$v){
-            if($ydNum == 0 && date('Ymd',$userCreatetime) == date('Ymd',$v['createtime'])){
+            if($v['is_first'] == 1 && date('Ymd',$userCreatetime) == date('Ymd',$v['createtime'])){
                 $v['status'] = 0;
-            }elseif ($ydNum == 0){
+            }elseif ($v['is_first'] == 1){
                 $v['status'] = 1;
             }else{
-                $v['status'] = (int)($ydNum + 1);
+                $v['status'] = 2;
             }
-
-            $ydNum = $ydNum + 1;
         }
         return $this->ReturnJson->successFul(200, $order);
 
@@ -593,11 +579,16 @@ class OrderController extends AbstractController {
 
 
     private function payFiatInfo($uid){
+        $currency = $this->request->post('currency') ?? 'VND';
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+
+        $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
+        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1,$currency);
+        return $data;
     }
 
 
@@ -672,26 +663,23 @@ class OrderController extends AbstractController {
      * @param  $package_id 包名
      * @param  $share_strlog 用户信息
      * @param  $payment_type_id 支付方式ID
+     * @param  $currency 货币
      * @param  $money 输入的金额
      * @return array
      */
-    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$money = 0){
-        $withdrawConfig = Common::getMore('pay_before_num,withdraw_type_select,special_pay_types'); //充值前几次时匹配特定通道
-        $special_pay_types = explode(',',$withdrawConfig['special_pay_types']);
+    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$currency = 'VND',$money = 0){
+        $withdrawConfig = Common::getMore('pay_before_num'); //充值前几次时匹配特定通道
+
         if($money && $money > 0){
-            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money]];
+            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money],['currency','=',$currency]];
         }else{
-            $where = [['status','=',1]];
+            $where = [['status','=',1],['currency','=',$currency]];
         }
 
 
         //获取支付成功订单数据
         $order = [];
         if($uid)$order = Db::connection('readConfig')->table('order')->select('pay_status','paytype')->where('uid',$uid)->orderBy('id','desc')->first();
-        if($order && $order['pay_status'] == 1 && $withdrawConfig['withdraw_type_select'] == 2 && in_array($payment_type_id,$special_pay_types)){
-            $TwoPayType = Db::table('pay_type')->where($where)->where('name','=',$order['paytype'])->first();
-            if($TwoPayType && $TwoPayType['wake_status'] == 1) return $TwoPayType;
-        }
 
         $paymentWhere = '';
         if($payment_type_id)$paymentWhere = 'FIND_IN_SET('.$payment_type_id.',payment_ids)';
@@ -704,10 +692,6 @@ class OrderController extends AbstractController {
         if(!$pay_type_Array){
             $pay_type_Array = $this->getNewPayTypeArray($where,$paymentWhere,$pay_type_ids);
             if(!$pay_type_Array) {
-                $notAllPackageId = $this->notAllPackageId;
-                if($notAllPackageId)foreach ($notAllPackageId as $item){
-                    $where[] = ['id','<>',$item];
-                }
                 $pay_type_Array = $this->getNewPayTypeArray($where,'',$pay_type_ids);
                 if(!$pay_type_Array)return [];
             }
@@ -773,11 +757,9 @@ class OrderController extends AbstractController {
      */
     private function getPayType($pay_type_id,$money,$package_id,$uid,$share_strlog,$payment_type_id){
 
-        $is_brushgang_pay_type = Common::getConfigValue('is_brushgang_pay_type');
-        $brushgang_before_pay_money = Common::getConfigValue('brushgang_before_pay_money'); //筛子帮前几次充值低于多少走正常
 
         //如果客户端传入了支付通道，直接拿取使用
-        if($pay_type_id && ($is_brushgang_pay_type != 1 || $share_strlog['is_brushgang'] != 1 || $share_strlog['brushgang_pay_status'] != 1 ||  $brushgang_before_pay_money > $money)){
+        if($pay_type_id){
             $pay_type = Db::table('pay_type')
                 ->where([
                     ['minmoney','<=',$money],
@@ -794,11 +776,8 @@ class OrderController extends AbstractController {
 
         $pay_before_num = Common::getConfigValue('pay_before_num'); //充值前几次时匹配特定通道
 
-        if ($is_brushgang_pay_type == 1 && $share_strlog['is_brushgang'] == 1 && $share_strlog['brushgang_pay_status'] == 1 && $brushgang_before_pay_money <= $money){
-            $where = [['wake_status','=',1],['status','=',1]];
-        }else{
-            $where = [['status','=',1]];
-        }
+        $where = [['status','=',1]];
+
 
         $paymentWhere = '';
         if($payment_type_id)$paymentWhere = 'FIND_IN_SET('.$payment_type_id.',payment_ids)';
@@ -811,7 +790,7 @@ class OrderController extends AbstractController {
         $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids,$pay_before_num > $share_strlog['total_pay_num'] ? 1 : 0);
         if(!$pay_type_Array){
             $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
-            if(!$pay_type_Array && $share_strlog['is_brushgang'] == 1 && $brushgang_before_pay_money > $money){  //刷子帮如果没有匹配到通道走正常流程
+            if(!$pay_type_Array){  //刷子帮如果没有匹配到通道走正常流程
                 $where = [['status','=',1]];
                 $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
             }
