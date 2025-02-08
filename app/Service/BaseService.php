@@ -213,19 +213,32 @@ class BaseService
 
     /**
      * 遍历缓存键值
-     * @param int $cursor
+     * @param $cursor
      * @param string $prefix
      * @param string $pool
-     * @param int $dbIndex 数据库索引
-     * @return array|bool|\Redis
+     * @param int $dbIndex
+     * @return array
      * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
      */
-    public static function scanCacheKeys(int $cursor = 0, string $prefix = '*', string $pool = 'RedisMy6379', int $dbIndex = 4): array|bool|\Redis
+    public static function scanCacheKeys($cursor = 0, string $prefix = '*', string $pool = 'RedisMy6379', int $dbIndex = 4): array
     {
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
-        return $cache->scan($cursor, $prefix, 20);
+        $keys = [];
+        while (true) {
+            $keysTmp = $cache->scan($cursor, $prefix, 5000);
+            $keys = array_merge($keys, $keysTmp ?: []);
+            if ($cursor === 0) {
+                break;
+            }
+            // 游标为null了，重置为0，继续扫描
+            if ($cursor === null) {
+                $cursor = '0';
+            }
+        }
+        return $keys;
     }
 
     /**
