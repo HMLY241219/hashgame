@@ -36,7 +36,7 @@ class OrderController extends AbstractController {
     public function principalSheetIndex(){
         $param = $this->request->all();
         $uid = $param['uid'];
-        $this->logger->error('$uid'.$uid);
+        $this->logger->info('$uid'.$uid);
         $data = $this->payFiatCurrencyInfo($uid);
 
         $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
