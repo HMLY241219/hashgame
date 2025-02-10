@@ -58,7 +58,7 @@ class OrderController extends AbstractController {
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
         $data['cash_pay_water_multiple'] =  $sysConfig['cash_pay_water_multiple'];
         $data['is_people_top'] =  $sysConfig['is_people_top']; //人工充值是否在上面
-        return $this->ReturnJson->successFul(200, $data,2);
+        return $this->ReturnJson->successFul(200, $data);
     }
 
 
