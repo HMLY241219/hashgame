@@ -43,8 +43,8 @@ class WebHookController extends AbstractController{
     public function hookFB()
     {
         try {
-            $params = $this->request->getQueryParams();
-            return $this->response->write($params['hub_challenge']);
+            $params = $this->request->getParsedBody();
+            return $this->response->json($params);
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());
         }
