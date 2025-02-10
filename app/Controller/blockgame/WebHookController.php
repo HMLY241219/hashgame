@@ -44,6 +44,7 @@ class WebHookController extends AbstractController{
     {
         try {
             $params = $this->request->getParsedBody();
+            $this->logger->alert('WebHookController.hookFB：' . $params);
             return $this->response->json($params);
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());
