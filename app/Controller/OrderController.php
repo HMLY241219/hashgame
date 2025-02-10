@@ -37,67 +37,28 @@ class OrderController extends AbstractController {
         $param = $this->request->all();
         $uid = $param['uid'];
 
-
-        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
-        if(!$userinfo){
-            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
-        }
+        $data = $this->payFiatCurrencyInfo($uid);
 
         $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
-
-        $data['total_pay_num'] = $userinfo['total_pay_num'];
-        //快捷的提现金额
-        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num"); //最低充值金额
 
 
-
         $data['payment_type'] = []; //普通充值
 
-        $payment_type = Db::connection('readConfig')->table('payment_type')->select('id','name','image','type','url','zs_bili','protocol_ids','first_zs_bonus_bili','zs_bonus_bili')->where('status',1)->orderBy('weight','desc')->get()->toArray();
-
-        //获取支付渠道
-
-        $data['defaultNewMoney'] = $data['defaultMoney'];
-
+        $payment_type = $this->PayService->getPaymentType(['status' => 1,'type' => 2]);
 
         //数字货币协议
         $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
-
-        foreach($payment_type as $key => $v){
-            //判断是否显示视频
-            if($key == 0  && $data['payType'] && !in_array($v['id'],$this->showVideoUrlPaymentId))$data['payType']['video_url'] = '';
-
-            if($v['image'])$v['image'] = Common::domain_name_path((string)$v['image']);
-            if ($v['type'] == 2){
-                $payment_type_array = explode(',',$v['protocol_ids']);
-                foreach ($digital_currency_protocol as $digital_currency){
-                    if(in_array($digital_currency['id'],$payment_type_array)){
-                        if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
-                        $v['pay_type_array'][] = $digital_currency;
-                    }
-                }
-                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($data['total_pay_num'],$v['zs_bili']);
-                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
-                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
-                $data['payment_type'][] = $v;
-            }else{
-
-                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($data['total_pay_num'],$v['zs_bili']);
-                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
-                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
-                $data['payment_type'][] = $v;
-            }
-        }
-
+        //数字货币信息
+        $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
 
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
         $data['cash_pay_water_multiple'] =  $sysConfig['cash_pay_water_multiple'];
         $data['is_people_top'] =  $sysConfig['is_people_top']; //人工充值是否在上面
-        return $this->ReturnJson->successFul(200, $data);
+        return $this->ReturnJson->successFul(200, $data,2);
     }
 
 
@@ -568,17 +529,16 @@ class OrderController extends AbstractController {
      */
     #[RequestMapping(path:'getRechargeConfiguration')]
     public function getRechargeConfiguration(){
-        $uid = $this->request->post('uid');
-        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
-        if(!$userinfo){
-            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
-        }
-
-        $this->getRechargeConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        return $this->ReturnJson->successFul(200, $this->payFiatCurrencyInfo($this->request->post('uid') ?? 0));
     }
 
 
-    private function payFiatInfo($uid){
+    /**
+     * 获取法币支付页面信息
+     * @param string|int $uid 用户id
+     * @return array
+     */
+    private function payFiatCurrencyInfo(string|int $uid){
         $currency = $this->request->post('currency') ?? 'VND';
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
@@ -588,7 +548,44 @@ class OrderController extends AbstractController {
 
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1,$currency);
+        $data['fiat_currency_payment_type'] = $this->getPaymentInfo($payment_type,$userinfo);  //法币支付方式
+        $data['userinfo'] = $userinfo;
         return $data;
+    }
+
+
+    /**
+     * 解析支付类型与赠送
+     * @param array $payment_type 支付类型
+     * @param array $userinfo  用户信息
+     * @param array $digital_currency_protocol 虚拟币协议
+     * @return array
+     */
+    private function getPaymentInfo(array $payment_type,array $userinfo,array $digital_currency_protocol = []){
+        $new_payment_type = [];
+        foreach($payment_type as $key => $v){
+            if($v['image'])$v['image'] = Common::domain_name_path((string)$v['image']);
+            if ($v['type'] == 2){
+                $payment_type_array = explode(',',$v['protocol_ids']);
+                foreach ($digital_currency_protocol as $digital_currency){
+                    if(in_array($digital_currency['id'],$payment_type_array)){
+                        if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
+                        $v['pay_type_array'][] = $digital_currency;
+                    }
+                }
+                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($userinfo['total_pay_num'],$v['zs_bili']);
+                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
+                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
+                $new_payment_type[] = $v;
+            }else{
+
+                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($userinfo['total_pay_num'],$v['zs_bili']);
+                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
+                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
+                $new_payment_type[] = $v;
+            }
+        }
+        return $new_payment_type;
     }
 
 
