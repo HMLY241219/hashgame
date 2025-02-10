@@ -539,7 +539,6 @@ class OrderController extends AbstractController {
      */
     private function payFiatCurrencyInfo(string|int $uid){
         $currency = $this->request->post('currency') ?? 'VND';
-        $this->logger->error('$currency'.$currency);
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
@@ -606,45 +605,50 @@ class OrderController extends AbstractController {
         $shop_id = 0;
         $pt_pay_count_config = Common::getConfigValue('pt_pay_count') ?: 0;
 //        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0) && $this->getOrderIp((int)$uid)){  //首充充值商城判断  只能参加一次
-        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
-            if($marketing_shop){
+        try {
+            if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
+                if($marketing_shop){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }elseif($total_pay_score){//客损
+                $type_array = Db::connection('readConfig')->table('shop_log')->whereIn('type',[7,20])->where([['uid','=',$uid]])->pluck('type')->toArray();
+                $customer_where = [];
+                foreach ([7,20] as $val) if(!in_array($val,$type_array)) $customer_where[] = $val;
+
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1],['currency','=', $currency]])->orderBy('customer_money','desc')->first();
+                if($marketing_shop){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }
+            if(!isset($defaultMoney) && $total_pay_score){  //破产
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)],['currency','=', $currency]])->orderBy('weight','desc')->first();
+                if($marketing_shop && Db::table('shop_log')->where([['uid','=',$uid],['type','=',6]])->count() < $marketing_shop['num']){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }
+
+
+
+
+            if(!isset($defaultMoney)){
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where([['status','=',1],['type','=',0],['user_type','=',$user_type],['currency','=', $currency]])->orderBy('weight','desc')->first();
                 $defaultMoney = $marketing_shop['bonus_config'];
                 $cash_money = $marketing_shop['cash_config'];
                 $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
             }
-        }elseif($total_pay_score){//客损
-            $type_array = Db::connection('readConfig')->table('shop_log')->whereIn('type',[7,20])->where([['uid','=',$uid]])->pluck('type')->toArray();
-            $customer_where = [];
-            foreach ([7,20] as $val) if(!in_array($val,$type_array)) $customer_where[] = $val;
-
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1],['currency','=', $currency]])->orderBy('customer_money','desc')->first();
-            if($marketing_shop){
-                $defaultMoney = $marketing_shop['bonus_config'];
-                $cash_money = $marketing_shop['cash_config'];
-                $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
-            }
-        }
-        if(!isset($defaultMoney) && $total_pay_score){  //破产
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)],['currency','=', $currency]])->orderBy('weight','desc')->first();
-            if($marketing_shop && Db::table('shop_log')->where([['uid','=',$uid],['type','=',6]])->count() < $marketing_shop['num']){
-                $defaultMoney = $marketing_shop['bonus_config'];
-                $cash_money = $marketing_shop['cash_config'];
-                $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
-            }
-        }
-
-
-
-
-        if(!isset($defaultMoney)){
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where([['status','=',1],['type','=',0],['user_type','=',$user_type],['currency','=', $currency]])->orderBy('weight','desc')->first();
-            $defaultMoney = $marketing_shop['bonus_config'];
-            $cash_money = $marketing_shop['cash_config'];
-            $hot_config = $marketing_shop['hot_config'];
+        }catch (\Exception $e){
+            $this->logger->error('获取充值商城配置失败:'.$e->getMessage());
+            $this->logger->error('获取充值商城currency:'.$currency);
         }
 
         return [$defaultMoney,$cash_money,$hot_config,$shop_id];
