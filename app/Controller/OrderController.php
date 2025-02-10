@@ -202,17 +202,22 @@ class OrderController extends AbstractController {
     public function OrderPay(){
 
         $uid = $this->request->post('uid');
-        $money   = $this->request->post('money') ?? 0;  //充值金额已分为单位
-        $pay_type_id   = $this->request->post('pay_id');  //充值金额已分为单位
+        $money   = $this->request->post('money') ?? 0;  //充值金额
+        $pay_type_id   = $this->request->post('pay_id');  //支付类型ID
         $active_id = $this->request->post('active_id') ?? 0; //活动ID
         $type = $this->request->post('type') ?? 0; //活动类型
         $payment_type_id = $this->request->post('payment_type_id') ?? 1; //活动类型
         $is_hand_enter = $this->request->post('is_hand_enter') ?? 0; //是否是手动输入金额 1=是,0=否
-        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
-        $protocol_money = $this->request->post('protocol_money') ?? 0; //数字货币金额
+        $currency = $this->request->post('currency') ?? 'VND'; //法币
+//        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
+
 
         $order_min_money = Common::getConfigValue("order_min_money");
         if(!$active_id && !$type && $money < $order_min_money) return $this->ReturnJson->failFul(228);  //抱歉，你的充值金额小于了最低充值金额
+
+        //获取货币比例
+        $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['currency' => $currency,'status' => 1],field: 'bili',selectType: 2);
+        if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
 
 
         $orderTime = $this->OrderStatusNum($uid);
@@ -263,7 +268,7 @@ class OrderController extends AbstractController {
 
 
             [$money,$zs_bonus,$get_money,$zs_money,$day] = $this->activeValue($active);
-
+            $pay_price = $money;
 //            if($money < $active['money']){
 //                return $this->ReturnJson->failFul(256);
 //            }
@@ -313,11 +318,11 @@ class OrderController extends AbstractController {
             "day"           => $day ,
             "ordersn"  => Common::doOrderSn(000),
             "paytype"       => $pay_type['name'],
-            "zs_bonus"      => $zs_bonus,
-            "zs_money"      => $zs_money,
-            "money"      => bcadd((string)$get_money,(string)$zs_money,0),
-            'get_money' => $get_money,
-            'price'    => $money,
+            "zs_bonus"      => $this->PayService->getFiatCryptoConversion((string)$zs_bonus,$currency_and_ratio['bili']),  //转换为U
+            "zs_money"      => $this->PayService->getFiatCryptoConversion((string)$zs_money,$currency_and_ratio['bili']),//转换为U
+            "money"      => $this->PayService->getFiatCryptoConversion(bcadd((string)$get_money,(string)$zs_money,0),$currency_and_ratio['bili']),//转换为U
+            'get_money' => $this->PayService->getFiatCryptoConversion((string)$get_money,$currency_and_ratio['bili']),//转换为U
+            'price'    => $this->PayService->getFiatCryptoConversion((string)$money,$currency_and_ratio['bili']),//转换为U
             'email'         => $email,
             'phone'        => $phone,
             'nickname'        => $phone,
@@ -332,6 +337,8 @@ class OrderController extends AbstractController {
             'channel' => $share_strlog['channel'],
             'shop_id' => $shop_id ?? 0,
             'handshop_id' => $handshop_id ?? 0,
+            'pay_price' => $money,
+            'currency' => $currency,
         ];
 
         $order_id = Db::table('order')->insertGetId($createData);
@@ -353,14 +360,14 @@ class OrderController extends AbstractController {
             });
         }
         //数字货币充值
-        if($protocol_name){
-            $payment_type_type = Db::connection('readConfig')->table('payment_type')->where('id',$pay_type['payment_ids'])->value('type');
-            if($payment_type_type == 2){
-                $createData['protocol_name'] = $protocol_name; //协议名称
-                $createData['protocol_money'] = $protocol_money; //货币数量
-                $this->setOrderProtocol($order_id,$createData);
-            }
-        }
+//        if($protocol_name){
+//            $payment_type_type = Db::connection('readConfig')->table('payment_type')->where('id',$pay_type['payment_ids'])->value('type');
+//            if($payment_type_type == 2){
+//                $createData['protocol_name'] = $protocol_name; //协议名称
+//                $createData['protocol_money'] = $protocol_money; //货币数量
+//                $this->setOrderProtocol($order_id,$createData);
+//            }
+//        }
 
         $apInfo = $this->pay->pay($pay_type['name'],$createData,$baseUserInfo);
 
@@ -376,6 +383,7 @@ class OrderController extends AbstractController {
         return $this->ReturnJson->successFul(200, $apInfo['data']['payurl']);
 
     }
+
 
 
     /**
@@ -546,7 +554,7 @@ class OrderController extends AbstractController {
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
-        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1,$currency);
+        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
         $data['fiat_currency_payment_type'] = $this->getPaymentInfo($payment_type,$userinfo);  //法币支付方式
         $data['userinfo'] = $userinfo;
         return $data;
@@ -664,17 +672,17 @@ class OrderController extends AbstractController {
      * @param  $package_id 包名
      * @param  $share_strlog 用户信息
      * @param  $payment_type_id 支付方式ID
-     * @param  $currency 货币
      * @param  $money 输入的金额
      * @return array
      */
-    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$currency = 'VND',$money = 0){
+    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$money = 0){
+        $currency = $this->request->post('currency') ?? 'VND';
         $withdrawConfig = Common::getMore('pay_before_num'); //充值前几次时匹配特定通道
 
         if($money && $money > 0){
-            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money],['currency','=',$currency]];
+            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money],['currency','=',$currency],['type','=',1]];
         }else{
-            $where = [['status','=',1],['currency','=',$currency]];
+            $where = [['status','=',1],['currency','=',$currency],['type','=',1]];
         }
 
 
@@ -757,7 +765,7 @@ class OrderController extends AbstractController {
      * @return array
      */
     private function getPayType($pay_type_id,$money,$package_id,$uid,$share_strlog,$payment_type_id){
-
+        $currency = $this->request->post('currency') ?? 'VND';
 
         //如果客户端传入了支付通道，直接拿取使用
         if($pay_type_id){
@@ -777,7 +785,7 @@ class OrderController extends AbstractController {
 
         $pay_before_num = Common::getConfigValue('pay_before_num'); //充值前几次时匹配特定通道
 
-        $where = [['status','=',1]];
+        $where = [['status','=',1],['currency','=',$currency],['type','=',1]];
 
 
         $paymentWhere = '';
@@ -791,16 +799,7 @@ class OrderController extends AbstractController {
         $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids,$pay_before_num > $share_strlog['total_pay_num'] ? 1 : 0);
         if(!$pay_type_Array){
             $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
-            if(!$pay_type_Array){  //刷子帮如果没有匹配到通道走正常流程
-                $where = [['status','=',1]];
-                $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
-            }
             if(!$pay_type_Array){  //如果还是米有就直接在所有通道里面选择
-                $where = [['status','=',1]];
-                $notAllPackageId = $this->notAllPackageId;
-                if($notAllPackageId)foreach ($notAllPackageId as $item){
-                    $where[] = ['id','<>',$item];
-                }
                 $pay_type_Array = $this->getPayTypeArray($where,'',(string)$money,$pay_type_ids);
             }
             if(!$pay_type_Array)return ['code' => 227,'msg' => 'Sorry! No recharge channel has been matched yet','data' => []];
@@ -921,9 +920,9 @@ class OrderController extends AbstractController {
      */
     private function paymentIdZsBonus($payment_type_id,$money,$pt_pay_count){
         if($pt_pay_count <= 0){
-            $zs_bonus_str = Db::connection('readConfig')->table('payment_type')->where('id',$payment_type_id)->value('first_zs_bonus_bili');
+            $zs_bonus_str = $this->PayService->getPaymentType(['id' => $payment_type_id],'first_zs_bonus_bili',2)['first_zs_bonus_bili'];
         }else{
-            $zs_bonus_str = Db::connection('readConfig')->table('payment_type')->where('id',$payment_type_id)->value('zs_bonus_bili');
+            $zs_bonus_str = $this->PayService->getPaymentType(['id' => $payment_type_id],'zs_bonus_bili',2)['zs_bonus_bili'];
         }
         if(!$zs_bonus_str)return '0';
         $zs_bonus_array = $this->getPaymentSendMoney($zs_bonus_str);
@@ -2617,7 +2616,7 @@ class OrderController extends AbstractController {
             return ['code' => '200','msg' => '支付成功','data' => []];
         }
 
-        if($order['price'] > $reallyPayMoney){
+        if($order['pay_price'] > $reallyPayMoney){
             $this->logger->error('支付金额不对小于实际支付金额直接返回-订单号:'.$ordersn);
             return ['code' => '200','msg' => '支付金额不对小于实际支付金额直接返回','data' => []];
         }
