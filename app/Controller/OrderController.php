@@ -219,7 +219,6 @@ class OrderController extends AbstractController {
         $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['currency' => $currency,'status' => 1],field: 'bili',selectType: 2);
         if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
 
-
         $orderTime = $this->OrderStatusNum($uid);
         if($orderTime)return $this->ReturnJson->failFul(230);//对不起！ 您目前有太多订单需要支付。 请稍等一会后再拉取订单
 
