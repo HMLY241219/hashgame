@@ -38,6 +38,17 @@ class WebHookController extends AbstractController{
             return $this->response->write($e->getMessage());
         }
     }
+
+    #[RequestMapping(path: 'hookfb')]
+    public function hookFB()
+    {
+        try {
+            $params = $this->request->getQueryParams();
+            return $this->response->write(var_export($params, true));
+        } catch (\Exception|ErrMsgException $e) {
+            $this->logger->alert($e->getMessage());
+        }
+    }
 }
 
 
