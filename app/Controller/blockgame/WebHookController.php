@@ -44,7 +44,7 @@ class WebHookController extends AbstractController{
     {
         try {
             $params = $this->request->getQueryParams();
-            return $this->response->write(var_export($params, true));
+            return $this->response->json($params);
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());
         }
