@@ -36,7 +36,6 @@ class OrderController extends AbstractController {
     public function principalSheetIndex(){
         $param = $this->request->all();
         $uid = $param['uid'];
-        $this->logger->info('$uid'.$uid);
         $data = $this->payFiatCurrencyInfo($uid);
 
         $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
@@ -540,6 +539,7 @@ class OrderController extends AbstractController {
      */
     private function payFiatCurrencyInfo(string|int $uid){
         $currency = $this->request->post('currency') ?? 'VND';
+        $this->logger->error('$currency'.$currency);
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
