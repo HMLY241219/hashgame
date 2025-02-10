@@ -200,7 +200,7 @@ class OrderController extends AbstractController {
      */
     #[RequestMapping(path:'OrderPay')]
     public function OrderPay(){
-
+        $this->logger->error('1111');
         $uid = $this->request->post('uid');
         $money   = $this->request->post('money') ?? 0;  //充值金额
         $pay_type_id   = $this->request->post('pay_id');  //支付类型ID
