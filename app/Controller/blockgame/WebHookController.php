@@ -44,7 +44,7 @@ class WebHookController extends AbstractController{
     {
         try {
             $params = $this->request->getQueryParams();
-            return $this->response->json(['challenge' => $params['hub_challenge']]);
+            return $this->response->write($params['hub_challenge']);
         } catch (\Exception|ErrMsgException $e) {
             $this->logger->alert($e->getMessage());
         }
