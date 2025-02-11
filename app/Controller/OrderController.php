@@ -215,6 +215,7 @@ class OrderController extends AbstractController {
         $order_min_money = Common::getConfigValue("order_min_money");
         if(!$active_id && !$type && $money < $order_min_money) return $this->ReturnJson->failFul(228);  //抱歉，你的充值金额小于了最低充值金额
 
+        $this->logger->error('$currency'.$currency);
         //获取货币比例
         $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['name' => $currency,'status' => 1],field: 'bili',selectType: 2);
         if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
