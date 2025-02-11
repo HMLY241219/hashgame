@@ -1286,7 +1286,7 @@ class OrderController extends AbstractController {
      * 虚拟货币回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'masatpayNotify')]
+    #[RequestMapping(path:'cryptocurrencypayNotify')]
     public function cryptocurrencypayNotify()
     {
         $data = $this->request->all();
