@@ -303,7 +303,7 @@ class OrderController extends AbstractController {
         $all_price = $share_strlog['total_pay_score'];
 
         //手续费
-        $fee = 0;
+        $fee = '0';
         if($pay_type['fee_bili'] && $pay_type['fee_bili'] > 0){    //比例手续费
             $fee = bcmul((string)$pay_type['fee_bili'],(string)$money,0);
         }
@@ -329,7 +329,7 @@ class OrderController extends AbstractController {
             'active_id' => $active_id,
             'ip' => Common::getIp($this->request->getServerParams()), //正式
             'all_price' => $all_price,
-            'fee_money' => $fee,
+            'fee_money' => $this->PayService->getFiatCryptoConversion($fee,$currency_and_ratio['bili']),
             'current_money' => $current_money,
             'package_id' => $share_strlog['package_id'],
             'channel' => $share_strlog['channel'],
@@ -1322,7 +1322,7 @@ class OrderController extends AbstractController {
 
         $createData = [
             "uid"           => $uid,
-            "day"           => 1 ,
+            "day"           => 0 ,
             "ordersn"  => $data['txid'],
             "paytype"       => $payData['symbol'],
             "zs_bonus"      => $this->PayService->getFiatCryptoConversion($payment_id_zs_bonus,$currency_and_ratio['bili']),  //转换为U
