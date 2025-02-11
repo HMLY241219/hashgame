@@ -216,7 +216,7 @@ class OrderController extends AbstractController {
         if(!$active_id && !$type && $money < $order_min_money) return $this->ReturnJson->failFul(228);  //抱歉，你的充值金额小于了最低充值金额
 
         //获取货币比例
-        $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['currency' => $currency,'status' => 1],field: 'bili',selectType: 2);
+        $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['name' => $currency,'status' => 1],field: 'bili',selectType: 2);
         if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
 
         $orderTime = $this->OrderStatusNum($uid);
@@ -1304,7 +1304,7 @@ class OrderController extends AbstractController {
         $pay_price = bcmul((string)$payData['amount'],'100',0); //支付金额
 
         if($payData['symbol'] != 'USDT'){  //不是U需要转换金额
-            $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['currency' => $payData['symbol']],field: 'bili',selectType: 2);
+            $currency_and_ratio = $this->PayService->getCurrencyAndRatio(where: ['name' => $payData['symbol']],field: 'bili',selectType: 2);
             if(!$currency_and_ratio){
                 $this->logger->error('虚拟货币类型暂不支持:'.json_encode($payData));
                 return 'ok';
