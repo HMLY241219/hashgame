@@ -11,6 +11,7 @@ use Hyperf\HttpServer\Annotation\Controller;
 use Hyperf\HttpServer\Annotation\RequestMapping;
 use App\Controller\slots\Common as SlotsCommon;
 use App\Controller\slots\DealWithController;
+use App\Service\PayService;
 use function Hyperf\Config\config;
 use function Hyperf\Coroutine\co;
 use function Hyperf\Support\value;
@@ -27,6 +28,8 @@ class WithdrawlogController extends AbstractController {
     protected Withdraw $withdraw;
     #[Inject]
     protected DealWithController $DealWithController;
+    #[Inject]
+    protected PayService $PayService;
 
 
 
@@ -70,7 +73,7 @@ class WithdrawlogController extends AbstractController {
     public function index(){
 
         $uid = $this->request->post('uid');
-        $is_new = $this->request->post('is_new') ?? 0;
+
         //统一处理三方流水输赢情况
         $this->DealWithController->setUserData($uid);
 
@@ -91,28 +94,49 @@ class WithdrawlogController extends AbstractController {
 
         $data['withdraw_money'] = $data['now_cash_score_water'] >= $data['need_cash_score_water'] ? $data['coin'] : $data['withdraw_money_other'];
 
-        $withConfig = Common::getMore("with_min_money,with_max_money,with_money_config,is_upi_withdraw,withdraw_fee_bili,withdraw_fee_amount"); //退款最小金额
+        $withConfig = Common::getMore("with_min_money,with_max_money,with_money_config,withdraw_fee_bili,withdraw_fee_amount"); //退款最小金额
         $data['with_min_money'] = $withConfig['with_min_money'];  //系统最小退款金额
         $data['with_max_money'] = $withConfig['with_max_money'];  //系统最大退款金额
         $data['with_money_config'] = explode('|',$withConfig['with_money_config']); //系统最大退款金额
-        $data['is_upi_withdraw'] = $withConfig['is_upi_withdraw']; //是否开启UPI退款:1=是,0=否
         $data['withdraw_fee_bili'] = $withConfig['withdraw_fee_bili']; //退款手续费比例
         $data['withdraw_fee_amount'] = $withConfig['withdraw_fee_amount']; //退款手续费固定值
 
-        $query = Db::table('user_withinfo')->select('account','id','ifsccode','type','phone','backname','email')->where([['uid','=',$uid]]);
-        if($data['is_upi_withdraw'] != 1)$query->where('type','=','1');
+
+        $data['withdraw_info'] = $this->withdrawFiatCurrencyInfo($uid);
+
+//        return json(['code' => 200,'msg' => '成功','data' => $data]);
+
+        return $this->ReturnJson->successFul(200, $data);
+    }
 
 
-        $refundmethod_where = [];
-        if(!$is_new)$refundmethod_where[] = ['type','<>',4];
-        $refundmethod_type = Db::connection('readConfig')->table('refundmethod_type')->where($refundmethod_where)->where('status',1)->orderBy('weight','desc')->get()->toArray();
+    /**
+     * 客户端获取不同国家的退款方式与地址
+     * @param
+     *
+     */
+    #[RequestMapping(path:'getWithDrawConfiguration')]
+    public function getWithDrawConfiguration(){
+        return $this->ReturnJson->successFul(200, $this->withdrawFiatCurrencyInfo($this->request->post('uid') ?? 0),2);
+    }
 
+    /**
+     * 得到提现类型与用户退款信息
+     * @param string|int $uid
+     * @param int $type 1= 查看法币与所有的虚拟币的退款方式 ， 2 = 查看指定货币的退款方式
+     * @return void
+     */
+    private function withdrawFiatCurrencyInfo(string|int $uid,int $type = 1){
+        $currency = $this->request->post('currency') ?? 'VND';
+        $refundmethod_type = match ($type){
+            1 => $this->PayService->getWithRefundMethodType(selectType: 3,currency: $currency),
+            2 => $this->PayService->getWithRefundMethodType(['status' => 1,'currency' => $currency]),
+        };
         //数字货币协议
-        $digital_currency_protocol = Db::connection('readConfig')->table('digital_currency_protocol')->selectRaw('id,englishname,icon,name,min_money,max_money')->get()->toArray();
-//        $data['refundmethod_type'] = Db::connection('readConfig')->table('refundmethod_type')->where('status',1)->orderBy('weight','desc')->get()->toArray();
+        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
         foreach($refundmethod_type as $value){
             if($value['type'] == 3){
-                $value['video_url'] = Db::connection('readConfig')->table('withdraw_type')->where('refundmethod_ids',3)->value('video_url');
+                $value['video_url'] = '';
             }elseif ($value['type'] == 4){
                 $refundmethod_type_array = explode(',',$value['protocol_ids']);
                 foreach ($digital_currency_protocol as $digital_currency){
@@ -121,7 +145,7 @@ class WithdrawlogController extends AbstractController {
                         $value['refundmethod_type_array'][] = $digital_currency;
                     }
                 }
-                $value['video_url'] = Db::connection('readConfig')->table('withdraw_type')->where('refundmethod_ids',4)->value('video_url');
+                $value['video_url'] = '';
             }else{
                 $value['video_url'] = '';
             }
@@ -130,23 +154,18 @@ class WithdrawlogController extends AbstractController {
 
 
         //获取用户提现的信息
-        $user_withinfo = $query->orderBy('id','desc')->get()->toArray();
+        $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'status' => 1,'currency' => $currency]);
         $data['user_withinfo'] = [];
         foreach ($user_withinfo as &$v){
             if(!isset($data['user_withinfo'][$v['type']]))$data['user_withinfo'][$v['type']] = $v;
         }
-        $user_wallet_address = Db::table('user_wallet_address')->where('uid',$uid)->get()->toArray();
+        $user_wallet_address =  $this->PayService->getUserWalletAddressInfo(['uid' => $uid]);
         if($user_wallet_address)foreach ($user_wallet_address as $wallet){
             $data['user_withinfo'][$wallet['type']] = $wallet;
         }
-
-        //获取平台提现列表
-        $data['withdraw_type'] = Db::table('withdraw_type')->select('id','englishname')->where('status','=','1')->orderBy('weight','desc')->get()->toArray();
-
-//        return json(['code' => 200,'msg' => '成功','data' => $data]);
-
-        return $this->ReturnJson->successFul(200, $data);
+        return $data;
     }
+
 
     /**
      * 获取提现渠道
@@ -157,6 +176,7 @@ class WithdrawlogController extends AbstractController {
      * @param $user_withdraw_type 退款类型:1=银行卡,2=upi,	3=钱包,4=数字货币
      */
     public function getWithdrawType($money,$withdraw_id_type_id,$package_id,$uid,$user_withdraw_type = 1){
+        $currency = $this->request->post('currency') ?? 'VND';
         //如果客户端传入了支付通道，直接拿取使用
         if($withdraw_id_type_id){
             $withdraw_type = Db::table('withdraw_type')
@@ -186,7 +206,7 @@ class WithdrawlogController extends AbstractController {
         //处理WDD退款评率订单
         $Redis = Common::Redis('RedisMy6379_1');
         $wddWithdrawStatus = $this->getWddWithdrawUidTime($Redis,$uid);
-        $where = [];
+        $where = [['currency','=',$currency]];
         if($wddWithdrawStatus)$where[] = ['name','<>','wdd_pay'];
 
         $withdraw_type = $this->getWithDrawTypeArray($money,$where,$paymentWhere,$withdraw_type_ids,$user_withdraw_type,$withCreatetime,$pay_before_num > $withCount ? 1 : 0);
@@ -284,13 +304,13 @@ class WithdrawlogController extends AbstractController {
     public function add(){
 
         $uid = $this->request->getAttribute('uid');
-        $money = (string)$this->request->post('money');  //用户提现金额已分为单位
-        $type = $this->request->post('type') ?? 1; //1=Cash ,2=Bonus
+        $money = (string)$this->request->post('money');  //U的金额
         $user_withinfo_id = $this->request->post('user_withinfo_id'); //用户退款ID
         $withdraw_type_id   = $this->request->post('withdraw_id_type_id') ?? 0;  //提现通道ID
         $refundmethod_type_id = $this->request->post('refundmethod_type_id') ?? 1; //退款方式ID:1=银行卡,2=UPI,3=钱包,4=数字货币
-//        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
-//        $protocol_money = $this->request->post('protocol_money') ?? 0; //数字货币金额
+        $currency = $this->request->post('currency') ?? 'VND'; //货币
+        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
+
 
 
         $userinfo = Db::table('userinfo as a')
@@ -307,12 +327,13 @@ class WithdrawlogController extends AbstractController {
         if($userinfo['total_pay_score'] <= 0 && $userinfo['withdraw_money_other'] <= 0) return $this->ReturnJson->failFul(239);
 
 
-
+        //获取货币比例
+        $currency_and_ratio = $this->PayService->getCurrencyAndRatio(['name' => $currency,'status' => 1],2,'bili',2);
+        if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
 
 
         $getConfig = Common::getMore('withdraw_fee_bili,withdraw_fee_amount,special_package_ids');
-        //判断走新包配置还是老包
-        $special_package_Array = $getConfig['special_package_ids'] ? explode(',',$getConfig['special_package_ids']) : [];
+
 
         //平台退款手续费
         if($money <= 10000){
@@ -322,15 +343,13 @@ class WithdrawlogController extends AbstractController {
         }else{
             $pt_fee_momey = bcmul((string)$getConfig['withdraw_fee_bili'],$money,0);
             $pt_fee_momey = bcadd($pt_fee_momey,(string)$getConfig['withdraw_fee_amount'],0);
-//            if(in_array($userinfo['package_id'],$special_package_Array)){
-//                $pt_fee_momey = bcadd($pt_fee_momey,(string)$getConfig['withdraw_fee_amount'],0);
-//            }
+
         }
 
 
 //        $really_money = bcadd($money ,$pt_fee_momey,0); //用户真实扣除的金额
         $really_money = bcsub($money ,$pt_fee_momey,0); //用户真实得到的金额
-
+        $really_withdraw_money = $this->PayService->getFiatCryptoConversion($really_money,$currency_and_ratio['bili'],2);
 
 
         if(!$money || $money <= 0 || !$user_withinfo_id)return $this->ReturnJson->failFul(219);
@@ -363,16 +382,14 @@ class WithdrawlogController extends AbstractController {
 
         //钱包与数字货币
         if(in_array($refundmethod_type_id,[3,4])){
-            $user_withinfo = Db::table('user_wallet_address')->where(['uid' => $uid,'id' => $user_withinfo_id])->first();
+            $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
             $user_withinfo['email'] = '';
             $user_withinfo['phone'] = '';
         }else{
             //用户提现信息判断
-            $user_withinfo = Db::table('user_withinfo')->where(['id' => $user_withinfo_id,'uid' => $uid])->first();
+            $user_withinfo = $this->PayService->getUserWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
-            $is_upi_withdraw = Common::getConfigValue("is_upi_withdraw");
-            if($is_upi_withdraw != 1 && $user_withinfo['type'] != 1)return $this->ReturnJson->failFul(266);
         }
 
         //用户提现平台判断
@@ -404,24 +421,11 @@ class WithdrawlogController extends AbstractController {
 
         }
 
-//        $vip_log = Db::table('vip_log')->select('createtime')->where(['uid' => $uid,'vip' => $userinfo['vip'],'type' => 1])->first();
-//        if(!$vip_log)$vip_log['createtime'] = $userinfo['createtime'];
-//        //Vip升级之后的退款金额
-//        $vip_level_money = Db::table('withdraw_log')->where([['uid','=',$uid],['createtime','>=',$vip_log['createtime']]])->whereIn('status',[0,3,1])->sum('money');
-//        $vip_level_money = $vip_level_money ?: 0;
-//        //近30天充值
-//        // $vip_pay_money = Db::table('order')->where([['uid','=',$uid],['pay_status','=',1],['createtime','>=',strtotime('-30 day')]])->sum('price');
-//        // $vip_pay_money = $vip_pay_money ?: 0;
-//
-//        if(($withdraw_vip['withdraw_max_money'] && bcadd((string)$money,(string)$vip_level_money,0) > $withdraw_vip['withdraw_max_money'])){
-//            return $this->ReturnJson->failFul(272);
-//        }
+
 
         //关联用户数据
         $gl_data = $this->getGlDataArray($uid);
 
-
-//        $cpf_withdraw_log = Db::table('withdraw_log')->select('id')->where(['cpf' => $user_withinfo['cpf'],'package_id' => $userinfo['package_id'],'status' => 1])->where('uid','<>',$uid)->first();
 
         [$auditdesc,$user_withdraw_bili,$firstmoney,$lastmoney,$dataList] = $this->subControl($money,$day_with_moeny,(string)$userinfo['coin'],(string)$userinfo['total_pay_score'],(string)$userinfo['total_give_score'],$new_total_exchange,(string)$userinfo['total_score'],(string)$userinfo['total_water_score'],$day_withdraw_num,(int)$userinfo['af_status'],(int)$uid,(string)$userinfo['city'],$userinfo,$gl_data);
 
@@ -478,6 +482,8 @@ class WithdrawlogController extends AbstractController {
             'email' =>  $user_withinfo['email'] ?:  $userinfo['jiaemail'],
             'phone' => $user_withinfo['phone'] ?:  $userinfo['jiaphone'],
             'withdraw_money_other' => $withdraw_money_other,
+            'really_withdraw_money' => $really_withdraw_money,
+            'currency' => $currency,
         ];
 
 
@@ -490,23 +496,12 @@ class WithdrawlogController extends AbstractController {
 
         if(!$res) return $this->ReturnJson->failFul(246);
 
-        //数字货币充值
-        if($refundmethod_type_id == 4){
-            $data['protocol_name'] = $user_withinfo['protocol_name']; //协议名称
-            $rupee_exchange_rate = Common::getConfigValue('rupee_exchange_rate');
-            $data['protocol_money'] = bcdiv($really_money,(string)$rupee_exchange_rate,0); //货币数量
-            $this->setWithdrawProtocol($withdraw_log_id,$data);
-        }
-
         if($auditdesc != 0){
-            // if(Common::getConfigValue('is_tg_send') == 1) {
-            //     //风控订单发送审核信息
-            //     \service\TelegramService::withdrawRisk($data);
-            // }
             $userinfo['uid'] = $uid;
             $this->setUserWithdrawLogInfo($userinfo,(int)$money);
             return $this->ReturnJson->successFul();
         }
+        $data['protocol_name'] = $protocol_name;
         $data['jianame'] = $userinfo['jianame'];
         $apInfo = $this->withdraw->withdraw($data,$data['withdraw_type'],2);
         if($apInfo['code'] != 200) return $this->ReturnJson->failFul(246);
@@ -524,22 +519,6 @@ class WithdrawlogController extends AbstractController {
         return $this->ReturnJson->successFul();
     }
 
-
-
-    /**
-     * 虚拟币订单
-     * @param $createData  订单数据
-     * @return void
-     */
-    private function setWithdrawProtocol($order_id,$createData){
-        Db::table('withdraw_protocol')->insert([
-            'id' => $order_id,
-            'ordersn' => $createData['ordersn'],
-            'protocol_name' => $createData['protocol_name'],
-            'protocol_money' => $createData['protocol_money'],
-            'money' => $createData['money'],
-        ]);
-    }
 
 
     /**
@@ -979,1184 +958,6 @@ class WithdrawlogController extends AbstractController {
     }
 
 
-
-    /**
-     * serpay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'serpayNotify')]
-    public function serpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('serpay提现:'.json_encode($data));
-
-        $custOrderNo=$data['custOrderNo'] ?? '';
-        $ordStatus= isset($data["ordStatus"]) && $data["ordStatus"] == '07' ? 1 : 2;
-        $res = $this->Withdrawhandle($custOrderNo,$ordStatus,$data);
-        if($res['code'] == 200){
-            return "SC000000";
-        }
-        $this->logger->error('serpay提现事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-        return '';
-    }
-
-
-
-    /**
-     * tm_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'tmpayNotify')]
-    public function tmpayNotify(){
-        $data = $this->request->all();
-        $this->logger->error('tm_pay提现回调:'.json_encode($data));
-
-        $ordersn=$data['data']['mch_trade_no'] ?? '';
-        $trade_status =$data['data']['trade_status'] ?? '';
-        $status = ($data["code"] == 0 && $trade_status == 'SUCC') ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "SUCC";
-        }
-        $this->logger->error('tm_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-    }
-
-
-    /**
-     * waka_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'wakapayNotify')]
-    public function wakapayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('waka_pay提现:'.json_encode($data));
-
-        $ordersn=$data['order_no'] ?? '';
-
-
-        $status = $data["result"] == 'success' ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'ok';
-        }
-        $this->logger->error('waka_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-    }
-
-
-    /**
-     * fun_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'funpayNotify')]
-    public function funpayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('fun_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merchantOrderId'] ?? '';
-
-        if($data["subCode"] == 203 || $data["subCode"] == 201){
-            $this->logger->error('funpay订单处理中-ordersn:'.$ordersn);
-            return 'success';
-        }
-
-        $status = $data["subCode"] == 200 ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('fun_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-    }
-
-
-    /**
-     * go_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'gopayNotify')]
-    public function gopayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('go_pay提现:'.json_encode($data));
-
-        $ordersn=$data['data']['orderId'] ?? '';
-
-
-        $status = $data["code"] == 200 ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('go_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-
-    }
-
-
-    /**
-     * eanishoppayNotify提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'eanishoppayNotify')]
-    public function eanishoppayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('eanishoppayNotify提现:'.json_encode($data));
-
-        $ordersn=$data['data']['merchantTradeNo'] ?? '';
-
-
-        $status = $data['data']["status"] == 'PAID' ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['code' => 'OK']) ;
-        }
-        $this->logger->error('eanishoppayNotify提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-
-    }
-
-
-    /**
-     * 24hrpay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'hr24payNotify')]
-    public function hr24payNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('24hrpay提现:'.json_encode($data));
-
-        $ordersn=$data['mchOrderNo'] ?? '';
-
-
-        $status = $data['status'] == 2 ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "SUCCESS";
-        }
-        $this->logger->error('24hrpay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-
-    }
-
-
-    /**
-     * ai_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'aipayNotify')]
-    public function aipayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('ai_pay提现:'.json_encode($data));
-
-        $ordersn=$data['order_no'] ?? '';
-
-
-        $status = $data["result"] == 'success' ? 1 : 2;
-        if(!$ordersn)return '';//订单信息错误
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'ok';
-        }
-        $this->logger->error('ai_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
-    }
-
-
-    /**
-     * x_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'xpayNotify')]
-    public function xpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('x_pay提现:'.json_encode($data));
-        $ordersn=$data['mchOrderNo'] ?? '';
-        $ordStatus= $data["state"] ?? '';
-        if($ordStatus == 1){
-            Db::name('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($data).'x_pay订单处理中','type'=>2,'createtime' => time()]);
-            return "success";
-        }
-
-        $status = $ordStatus == 2 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        //xpay有些支付下单会超时没得订单号，这里处理下
-//        Db::name('withdraw_log')->where('ordersn',$ordersn)->update(['platform_id' => $data['transferId']]);
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('xp_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-    /**
-     * lets_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'letspayNotify')]
-    public function letspayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('lets_pay提现:'.json_encode($data));
-
-        $ordersn=$data['mchTransNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-        if($ordStatus == 1){
-            Db::name('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($data).'lets_pay订单处理中','type'=>2,'createtime' => time()]);
-            return "success";
-        }
-
-        $status = $ordStatus == 2 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('lets_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-    /**
-     * dragon_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'dragonpayNotify')]
-    public function dragonpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('dragon_pay提现:'.json_encode($data));
-
-        $ordersn = $data['orderId'] ?? '';
-        $ordStatus = $data["status"] ?? '';
-
-
-        if ($ordStatus == 0) return "success";
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('dragon_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-    /**
-     * ant_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'antpayNotify')]
-    public function antpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('ant_pay提现:'.json_encode($data));
-        $transdata = urldecode($data['transdata']);
-
-        $transdata_arr = json_decode($transdata,true);
-
-        $ordersn=$transdata_arr['order_no'] ?? '';
-        $ordStatus= $transdata_arr["resp_code"] ?? '';
-
-
-        if ($ordStatus == 'P') return "success";
-        $status = $ordStatus == 'S' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('ant_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-    /**
-     * ff_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'ffpayNotify')]
-    public function ffpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('lets_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merTransferId'] ?? '';
-        $ordStatus= $data["tradeResult"] ?? '';
-
-
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('ff_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-
-    /**
-     * cow_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'cowpayNotify')]
-    public function cowpayNotify() {
-        $data = $this->request->all();
-        $transdata = urldecode($data['transdata']);
-        $this->logger->error('cow_pay提现:'.$transdata);
-
-        $transdata_arr = json_decode($transdata,true);
-
-        $ordersn=$transdata_arr['order_no'] ?? '';
-        $ordStatus= $transdata_arr["resp_code"] ?? '';
-
-
-        if ($ordStatus == 'P') return "success";
-        $status = $ordStatus == 'S' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('cow_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-
-    /**
-     * wdd_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'wddpayNotify')]
-    public function wddpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('wdd_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderID'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-
-        $status = $ordStatus == 0 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "OK";
-        }
-        $this->logger->error('wdd_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-    /**
-     * timi_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'timipayNotify')]
-    public function timipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('timi_pay提现:'.json_encode($data));
-
-        $ordersn=$data['out_trade_no'] ?? '';
-        $ordStatus= $data["code"] ?? '';
-
-        if($ordStatus == 2)return 'ok';
-
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "ok";
-        }
-        $this->logger->error('timi_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-
-    /**
-     * newfun_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'newfunpayNotify')]
-    public function newfunpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('newfun_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        if($ordStatus == 2)return 'SUCCESS';
-
-        $status = $ordStatus == 'success' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "SUCCESS";
-        }
-        $this->logger->error('newfun_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-
-    /**
-     * simply_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'simplypayNotify')]
-    public function simplypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('simply_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merOrderNo'] ?? '';
-        $ordStatus= $data["orderStatus"] ?? '';
-
-
-        $status = in_array($ordStatus,[2,3]) ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return "success";
-        }
-        $this->logger->error('simply_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-    /**
-     * lq_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'lqpayNotify')]
-    public function lqpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('lq_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderId'] ?? '';
-        $ordStatus= $data["processStatus"] ?? '';
-        if(in_array($ordStatus,[0,1,2,3]))return $this->response->json(['status' =>'success']);
-
-        $status = $ordStatus == 4 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['status' =>'success']);
-        }
-        $this->logger->error('lq_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return "";
-    }
-
-
-    /**
-     * threeq_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'threeqpayNotify')]
-    public function threeqpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('3q_pay提现:'.json_encode($data));
-
-        $ordersn=$data['mchOrderNo'] ?? '';
-        $ordStatus= $data["state"] ?? '';
-        $status = $ordStatus == 2 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('3q_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-
-
-    /**
-     * show_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'showpayNotify')]
-    public function showpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('show_pay提现:'.json_encode($data));
-
-        $ordersn=$data['order_number'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-        if($ordStatus == 1)return 'success';
-
-        $status = $ordStatus == 4 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('show_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-
-    /**
-     * g_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'gpayNotify')]
-    public function gpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('g_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-        if($ordStatus == 2)return 'success';
-
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('g_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-    /**
-     * tata_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'tatapayNotify')]
-    public function tatapayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('tata_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-        if(!in_array($ordStatus,[3,2]))return 'SUCCESS';
-
-        $status = $ordStatus == 2 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('tata_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-    /**
-     * pay_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'paypayNotify')]
-    public function paypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('pay_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merOrderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-        if($ordStatus == 'PROCESSED')return 'success';
-
-        $status = $ordStatus == 'PAID' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('pay_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'fail';
-    }
-
-
-    /**
-     * yh_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'yhpayNotify')]
-    public function yhpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('yh_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderNum'] ?? '';
-        $ordStatus= $data["remitResult"] ?? '';
-
-        $status = $ordStatus == '00' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['code' =>'200','msg' => '成功']);
-        }
-        $this->logger->error('yh_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return $this->response->json(['code' =>'200','msg' => '成功']);
-    }
-
-
-
-    /**
-     * newai_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'newaipayNotify')]
-    public function newaipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('newai_pay提现:'.json_encode($data));
-
-        $ordersn=$data['mchOrderNo'] ?? '';
-        $ordStatus= $data["state"] ?? '';
-
-        $status = $ordStatus == '2' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('newai_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-    /**
-     * allin1_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'allin1payNotify')]
-    public function allin1payNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('allin1_pay提现:'.json_encode($data));
-
-        $ordersn=$data['app_order_no'] ?? '';
-        $ordStatus= $data["success"] ?? '';
-
-        $status = $ordStatus == '1' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('allin1_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-    /**
-     * make_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'makepayNotify')]
-    public function makepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('make_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderId'] ?? '';
-        $ordStatus= $data["processStatus"] ?? '';
-
-        if(in_array($ordStatus,[0,1]))return 'OK';
-
-        $status = $ordStatus == '2' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'OK';
-        }
-        $this->logger->error('make_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'OK';
-    }
-
-    /**
-     * best_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'bestpayNotify')]
-    public function bestpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('best_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merchantOrderId'] ?? '';
-        $ordStatus= $data["code"] ?? '';
-
-        $status = $ordStatus == '1' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('best_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-    /**
-     * zip_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'zippayNotify')]
-    public function zippayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('zip_pay提现:'.json_encode($data));
-
-        $ordersn=$data['merchantOrderId'] ?? '';
-        $ordStatus= $data["code"] ?? '';
-
-        $status = $ordStatus == '1' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('zip_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-
-
-    /**
-     * upi_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'upipayNotify')]
-    public function upipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('upi_pay提现:'.json_encode($data));
-
-        $ordersn=$data['orderId'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        $status = $ordStatus == '1' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'OK';
-        }
-        $this->logger->error('upi_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'OK';
-    }
-
-
-
-    /**
-     * security_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'securitypayNotify')]
-    public function securitypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('security_pay提现:'.json_encode($data));
-
-        $ordersn=$data['client_order_no'] ?? '';
-        $ordStatus= $data["state"] ?? '';
-
-        if($ordStatus == 1 || $ordStatus == 9) return $this->response->json(['msg' => 'success'])->withStatus(200);
-
-        $status = $ordStatus == '2' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['msg' => 'success'])->withStatus(200);
-        }
-        $this->logger->error('security_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return $this->response->json(['msg' => 'success'])->withStatus(200);
-    }
-
-
-    /**
-     * vendoo_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'vendoopayNotify')]
-    public function vendoopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('vendoo_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['data']['mchOrderNo'] ?? '';
-        $ordStatus= $data['data']["payOutStatus"] ?? '';
-
-        if($ordStatus == 2 || $ordStatus == 3 || $ordStatus == 11) return 'OK';
-
-        $status = $ordStatus == '1' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'OK';
-        }
-        $this->logger->error('vendoo_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'OK';
-    }
-
-
-
-    /**
-     * rupeelink_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'rupeelinkpayNotify')]
-    public function rupeelinkpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('rupeelink_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['customerOrderCode'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        if($ordStatus == 1) return 'success';
-
-        $status = $ordStatus == '2' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('rupeelink_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-
-    /**
-     * unive_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'univepayNotify')]
-    public function univepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('unive_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['Traceno'] ?? '';
-        $ordStatus= $data["Status"] ?? '';
-
-        if($ordStatus == 1) return 'SUCCESS';
-
-        $status = $ordStatus == 'SUCCESS' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('unive_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-
-    /**
-     * no_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'nopayNotify')]
-    public function nopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('no_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data["state"] ?? '';
-
-
-        $status = $ordStatus == '3' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('no_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-
-
-    /**
-     * ms_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'mspayNotify')]
-    public function mspayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('ms_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data["orderStatus"] ?? '';
-
-        if($ordStatus == 'PENDING' || $ordStatus == 'CREATED') return 'SUCCESS';
-
-        $status = $ordStatus == 'SUCCESS' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('ms_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-
-
-    /**
-     * decent_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'decentpayNotify')]
-    public function decentpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('decent_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        if($ordStatus == 'creating' || $ordStatus == 'processing') return 'SUCCESS';
-
-        $status = $ordStatus == 'success' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['success' => true])->withStatus(200);
-        }
-        $this->logger->error('decent_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return $this->response->json(['success' => true])->withStatus(200);
-    }
-
-
-    /**
-     * fly_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'flypayNotify')]
-    public function flypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('fly_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['merchantOrderNum'] ?? '';
-        $ordStatus= $data["code"] ?? '';
-
-        $status = $ordStatus == 'SUCCESS' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('fly_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-    /**
-     * kk_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'kkpayNotify')]
-    public function kkpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('kk_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['partnerWithdrawNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 0;
-        }
-        $this->logger->error('kk_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 0;
-    }
-
-
-    /**
-     * tk_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'tkpayNotify')]
-    public function tkpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('tk_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['data']['order_id'] ?? '';
-        $ordStatus= $data["code"] ?? '';
-
-        $status = $ordStatus == 200 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'SUCCESS';
-        }
-        $this->logger->error('tk_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'SUCCESS';
-    }
-
-    /**
-     * kktwo_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'kktwopayNotify')]
-    public function kktwopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('kktwo_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['partnerWithdrawNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-        $status = $ordStatus == 1 ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 0;
-        }
-        $this->logger->error('kktwo_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 0;
-    }
-
-
-
-    /**
-     * one_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'onepayNotify')]
-    public function onepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('one_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['mchOrderNo'] ?? '';
-        $ordStatus= $data["orderStatus"] ?? '';
-        $status= $data["status"] ?? '';
-
-        $status = ($ordStatus == 'SUCCESS' && $status == 200) ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['success' => true])->withStatus(200);
-        }
-        $this->logger->error('one_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return $this->response->json(['success' => true])->withStatus(200);
-    }
-
-
-
-    /**
-     * global_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'globalpayNotify')]
-    public function globalpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('global_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['mchOrderNo'] ?? '';
-        $ordStatus= $data["status"] ?? '';
-
-
-        $status = $ordStatus == 'SUCCESS' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('global_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
-
-
-
-
-    /**
-     * a777_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'a777payNotify')]
-    public function a777payNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('a777_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['merchant_order_id'] ?? '';
-        $ordStatus= $data["order_status"] ?? '';
-
-        if($ordStatus != 'PAY_SUCCESS' && $ordStatus != 'PAY_FAIL') return $this->response->json(['success' => true])->withStatus(200);
-
-        $status = $ordStatus == 'PAY_SUCCESS' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return $this->response->json(['success' => true])->withStatus(200);
-        }
-        $this->logger->error('a777_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return $this->response->json(['success' => true])->withStatus(200);
-    }
-
-
-
-    /**
-     * masat_pay提现回调
-     * @return string|void
-     */
-    #[RequestMapping(path:'masatpayNotify')]
-    public function masatpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('masat_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
-
-        $ordersn=$data['orderNumber'] ?? '';
-        $ordStatus= $data["orderStatus"] ?? '';
-
-        if($ordStatus == 1) return 'success';
-
-        $status = $ordStatus == '3' ? 1 : 2;
-        $res = $this->Withdrawhandle($ordersn,$status,$data);
-
-        if($res['code'] == 200){
-            return 'success';
-        }
-        $this->logger->error('masat_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return 'success';
-    }
 
 
     /**

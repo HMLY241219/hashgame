@@ -90,6 +90,76 @@ class PayService extends BaseService
     }
 
     /**
+     * 获取退款方式
+     * @param array $where  条件
+     * @param string $field 字段
+     * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据 ， 3 = 特殊情况返回虚拟获取与对应的法币数据
+     * @param string $currency  法币，当 $selectType = 3 的时候必须传入
+     * @return
+     */
+    public function getWithRefundMethodType(array $where = [],string $field = 'id,name,type,currency,protocol_ids',int $selectType = 1,string $currency = 'VND'){
+        $query =  Db::connection('readConfig')
+            ->table('refundmethod_type')
+            ->selectRaw($field);
+
+        return match ($selectType){
+            1 => $query->where($where)->orderBy('weight','desc')->get()->toArray(),
+            2 => $query->where($where)->first(),
+            3 => $query->where(function ($q) use($currency) {
+                $q->where(['status' => 1, 'currency' => $currency])
+                    ->orWhere(['status' => 1, 'type' => 4]);
+            })->orderBy('weight','desc')->get()->toArray(),
+        };
+    }
+
+
+    /**
+     * 获取玩家退款地址
+     * @param array $where  条件
+     * @param string $field 字段
+     * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
+     * @return void
+     */
+    public function getUserWithdrawInfo(array $where = [],string $field = 'id,backname,account,ifsccode,phone,email,type,currency',int $selectType = 1){
+        $query = Db::connection('readConfig')
+            ->table('user_withinfo')
+            ->selectRaw($field)
+            ->where($where);
+
+        return match ($selectType){
+            1 => $query->get()
+                ->toArray(),
+            2 => $query->first(),
+
+        };
+    }
+
+
+
+    /**
+     * 获取玩家钱包地址
+     * @param array $where  条件
+     * @param string $field 字段
+     * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
+     * @return void
+     */
+    public function getUserWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name,type',int $selectType = 1){
+        $query = Db::connection('readConfig')
+            ->table('user_wallet_address')
+            ->selectRaw($field)
+            ->where($where);
+
+        return match ($selectType){
+            1 => $query->get()
+                ->toArray(),
+            2 => $query->first(),
+
+        };
+    }
+
+
+
+    /**
      * 获取数字货币与U的相互转换
      * @param string $money  法币或U
      * @param int|float $bili  转换比例
