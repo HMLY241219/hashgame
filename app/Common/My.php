@@ -6,16 +6,22 @@ namespace App\Common;
 use Hyperf\DbConnection\Db;
 use function Hyperf\Config\config;
 
+
+
+
 /**
  *  一些杂物处理
  */
 class My
 {
+
+    private static array $not_device_id_array = ['00000000000000000000000000000000'];
+
     /**
      * @return void 获取用户设备、手机、邮箱、关联银行账户姓名、关联银行卡账户
      */
     public static function getUidinformation(int $uid){
-        $share_strlog = Db::table('share_strlog')->select('phone','email','login_ip')->where('uid',$uid)->first();
+        $share_strlog = Db::table('share_strlog')->select('phone','email','login_ip','device_id')->where('uid',$uid)->first();
         if(!$share_strlog){
             return ['code' => 201,'msg' => '用户不存在','data' => []];
         }
@@ -27,17 +33,18 @@ class My
             $data['email']= $share_strlog['email'];
         }
 
+
+        if($share_strlog['device_id'] && !in_array($share_strlog['device_id'],self::$not_device_id_array)){
+            $data['deviceid']= $share_strlog['device_id'];
+        }
+
         if($share_strlog['login_ip']){
             $data['ip']= $share_strlog['login_ip'];
         }
-        $user_withinfo = Db::table('user_withinfo')->select('account','type')->where('uid',$uid)->orderBy('id','desc')->get()->toArray();
-        if($user_withinfo){
-            $typeCofig = config('my.withdrawType');
-            foreach ($user_withinfo as $value){
-                $data[$typeCofig[$value['type']]] = $value['account'];
-            }
+        $user_withinfo = Db::table('user_withinfo')->selectRaw('bankaccount')->where(['uid' => $uid,'type' => 1])->first();
+        if($user_withinfo['bankaccount']){
+            $data['bankaccount']= $user_withinfo['bankaccount'];
         }
-
         return ['code' => 200,'msg' => '成功','data' => $data];
     }
 
@@ -49,7 +56,7 @@ class My
     public static function glUid($uid){
 
 
-        $share_strlog = Db::table('share_strlog')->select(Db::raw('phone,email,ip'))->where('uid',$uid)->first();
+        $share_strlog = Db::table('share_strlog')->select(Db::raw('phone,email,ip,device_id'))->where('uid',$uid)->first();
         $where = '';
         if($share_strlog['phone']){
             $where .= "phone = '".$share_strlog['phone']."'";
@@ -59,6 +66,10 @@ class My
             $where .= $where ? " OR email = '".$share_strlog['email']."'" : "email = '".$share_strlog['email']."'";
         }
 
+
+        if($share_strlog['device_id'] && !in_array($share_strlog['device_id'],self::$not_device_id_array)){
+            $where .= $where ? " OR device_id = '".$share_strlog['device_id']."'" : "device_id = '".$share_strlog['device_id']."'";
+        }
 
 
         if($share_strlog['ip']){
@@ -102,7 +113,7 @@ class My
      */
     public static function glTypeUid($uid){
 
-        $share_strlog = Db::table('share_strlog')->select(Db::raw('phone,email,ip'))->where('uid',$uid)->first();
+        $share_strlog = Db::table('share_strlog')->select(Db::raw('phone,email,ip,device_id'))->where('uid',$uid)->first();
 
         $phoneUid = []; //关联的电话
         if($share_strlog['phone']) $phoneUid = Db::table('share_strlog')->where([['uid','<>',$uid],['phone','=',$share_strlog['phone']]])->pluck('uid')->toArray();
@@ -114,6 +125,15 @@ class My
 
 
 
+        $deviceUid = []; //关联的设备
+        if($share_strlog['device_id'] && !in_array($share_strlog['device_id'],self::$not_device_id_array)){
+            $share_strlog_array = Db::table('share_strlog')->selectRaw('uid')->where([['uid','<>',$uid],['device_id','=',$share_strlog['device_id']]])->get()->toArray();
+            if($share_strlog_array){
+                foreach ($share_strlog_array as $ll){
+                    $deviceUid[] = $ll['uid'];
+                }
+            }
+        }
 
 
         $ipUid = []; //关联的IP
@@ -122,27 +142,23 @@ class My
 
 
 
-        $user_withinfo = Db::table('user_withinfo')->select('account','type')->where('uid',$uid)->get()->toArray();
+        $user_withinfo = Db::table('user_withinfo')->select('account')->where('uid',$uid)->get()->toArray();
         $bankaccountUid = []; //关联的银行账号
-        $upiUid = []; //关联的银行账号
         if($user_withinfo){
-            $typeCofig = [1 => 'bankaccountWhere',2 => 'upiWhere'];
             $bankaccountWhere = [];
-            $upiWhere = [];
             foreach ($user_withinfo as $val){
-                $flied = $typeCofig[$val['type']] ?? '';
-                if($flied)array_push($$flied,(string)$val['account']);
+                $bankaccountWhere[] = $val['account'];
             }
 
             $bankaccountWhere = array_unique($bankaccountWhere); //去重
-            $upiWhere = array_unique($upiWhere); //去重
+
 
             if($bankaccountWhere)$bankaccountUid = Db::table('user_withinfo')->where('uid','<>',$uid)->whereIn('account',$bankaccountWhere)->groupBy('uid')->pluck('uid')->toArray();
-            if($upiWhere)$upiUid = Db::table('user_withinfo')->where('uid','<>',$uid)->whereIn('account',$upiWhere)->groupBy('uid')->pluck('uid')->toArray();
+
         }
 
 
-        return [$phoneUid,$emailUid,$ipUid,$bankaccountUid,$upiUid];
+        return [$phoneUid,$emailUid,$ipUid,$bankaccountUid,$bankaccountUid,$deviceUid];
     }
 
 
