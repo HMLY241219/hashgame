@@ -19,7 +19,7 @@ class PayService extends BaseService
      * @param int $selectType 查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
      * @return array
      */
-    public function getCurrencyAndRatio(array $where = [],int $type = 1,string $field = 'id,name,image,type,bili',int $selectType = 1)
+    public function getCurrencyAndRatio(array $where = [],int $type = 1,string $field = 'id,name,image,type,bili,pay_min_max',int $selectType = 1)
     {
         $query =  Db::connection('readConfig')
             ->table('currency_and_ratio')
