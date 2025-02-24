@@ -51,7 +51,8 @@ class OrderController extends AbstractController {
         $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
         //数字货币信息
         $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
-
+        //用户虚拟钱包地址
+        $data['user_wallet_address'] = Db::table('user_wallet_address')->selectRaw('id,address')->where('uid',$uid)->get()->toArray();
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
