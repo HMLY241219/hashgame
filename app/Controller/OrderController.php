@@ -40,7 +40,7 @@ class OrderController extends AbstractController {
 
         $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
 
-        $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num"); //最低充值金额
+        $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num,digital_currency_address"); //最低充值金额
 
 
         $data['payment_type'] = []; //普通充值
@@ -78,7 +78,7 @@ class OrderController extends AbstractController {
         }
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type_id,$money);
         if(!$is_new)  return $this->ReturnJson->successFul(200,  $data['payType']);
-        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        [$data['defaultMoney'],,$data['order_min_money'],$data['order_max_money']] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 //        $data['defaultNewMoney'] = [];
 //        if($data['payType']){
 //            foreach ($data['defaultMoney'] as $defaultMoneyValue){
@@ -512,6 +512,8 @@ class OrderController extends AbstractController {
         $cash_money = $cash_money ? explode(' ',$cash_money) : [];
         $hot_config = $hot_config ? explode(' ',$hot_config) : [];
         $data = [];
+        $order_min_money = '0';
+        $order_max_money = '0';
         foreach ($defaultMoney as $key => $val){
             [$money,$bouns] = explode('|',$val);
             [,$cash_money_bili] = $cash_money ? explode('|',$cash_money[$key]) : ['0','0'];
@@ -522,9 +524,11 @@ class OrderController extends AbstractController {
                 'hot_status'  => $hot_status,
                 'cash_bili' => $cash_money_bili,
             ];
+            if($key == 0)$order_min_money = $money;
+            $order_max_money = $money;
 
         }
-        return [$data,$shop_id];
+        return [$data,$shop_id,$order_min_money,$order_max_money];
     }
 
     /**
@@ -549,7 +553,7 @@ class OrderController extends AbstractController {
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
-        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        [$data['defaultMoney'],,$data['order_min_money'],$data['order_max_money']] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
@@ -893,7 +897,7 @@ class OrderController extends AbstractController {
     private function getBonus($money,$pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus){
         $bonus = 0;
         $cash_bili = 0;
-        [$defaultConfig,$shop_id] = $this->getMoneyConfig($pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus);
+        [$defaultConfig,$shop_id,] = $this->getMoneyConfig($pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus);
         foreach ($defaultConfig as $v){
             if($v['money'] == $money){
                 //比例的时候打开
