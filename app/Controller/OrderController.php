@@ -513,8 +513,7 @@ class OrderController extends AbstractController {
         $cash_money = $cash_money ? explode(' ',$cash_money) : [];
         $hot_config = $hot_config ? explode(' ',$hot_config) : [];
         $data = [];
-        $order_min_money = '0';
-        $order_max_money = '0';
+
         foreach ($defaultMoney as $key => $val){
             [$money,$bouns] = explode('|',$val);
             [,$cash_money_bili] = $cash_money ? explode('|',$cash_money[$key]) : ['0','0'];
@@ -525,8 +524,7 @@ class OrderController extends AbstractController {
                 'hot_status'  => $hot_status,
                 'cash_bili' => $cash_money_bili,
             ];
-            if($key == 0)$order_min_money = $money;
-            $order_max_money = $money;
+
 
         }
         return [$data,$shop_id,$order_min_money,$order_max_money];
