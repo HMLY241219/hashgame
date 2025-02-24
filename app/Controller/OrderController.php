@@ -79,7 +79,7 @@ class OrderController extends AbstractController {
         }
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type_id,$money);
         if(!$is_new)  return $this->ReturnJson->successFul(200,  $data['payType']);
-        [$data['defaultMoney'],,$data['order_min_money'],$data['order_max_money']] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 //        $data['defaultNewMoney'] = [];
 //        if($data['payType']){
 //            foreach ($data['defaultMoney'] as $defaultMoneyValue){
@@ -527,7 +527,7 @@ class OrderController extends AbstractController {
 
 
         }
-        return [$data,$shop_id,$order_min_money,$order_max_money];
+        return [$data,$shop_id];
     }
 
     /**
@@ -552,7 +552,7 @@ class OrderController extends AbstractController {
         if(!$userinfo){
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
-        [$data['defaultMoney'],,$data['order_min_money'],$data['order_max_money']] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
@@ -896,7 +896,7 @@ class OrderController extends AbstractController {
     private function getBonus($money,$pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus){
         $bonus = 0;
         $cash_bili = 0;
-        [$defaultConfig,$shop_id,] = $this->getMoneyConfig($pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus);
+        [$defaultConfig,$shop_id] = $this->getMoneyConfig($pt_pay_count,$total_pay_score,$coin,$uid,$package_id,$user_bonus);
         foreach ($defaultConfig as $v){
             if($v['money'] == $money){
                 //比例的时候打开
