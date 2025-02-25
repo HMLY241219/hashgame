@@ -49,6 +49,7 @@ class OrderController extends AbstractController {
 
         //数字货币协议
         $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
+        $data['digital_currency_protocol'] = $digital_currency_protocol;
         //数字货币信息
         $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
         //用户虚拟钱包地址
@@ -56,7 +57,6 @@ class OrderController extends AbstractController {
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
-        $data['digital_currency_address'] =  $sysConfig['digital_currency_address'];
         $data['cash_pay_water_multiple'] =  $sysConfig['cash_pay_water_multiple'];
         $data['is_people_top'] =  $sysConfig['is_people_top']; //人工充值是否在上面
         return $this->ReturnJson->successFul(200, $data);
