@@ -64,7 +64,7 @@ class Withdraw{
             "mchOrderId" => $withdrawlog['ordersn'],
 
             "merchantMemberNo" => $withdrawlog['uid'],
-            "amount"  =>  bcdiv((string)$withdrawlog['protocol_money'],'100',2),
+            "amount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
             "coin" => 'USDT',
             "language"  =>  'en',
             "rateType" => 1,
@@ -125,7 +125,7 @@ class Withdraw{
             "merchantNo"      => $this->mspay_merchantNo,
             "merchantOrderNo" => $withdrawlog['ordersn'],
             'description' =>  '3377WIN',
-            "payAmount"  =>  bcdiv((string)$withdrawlog['really_money'],'100',2),
+            "payAmount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
             "mobile"  =>  $withdrawlog['phone'],
             "email"  =>  $withdrawlog['email'],
             'bankNumber' => $withdrawlog['bankaccount'],
