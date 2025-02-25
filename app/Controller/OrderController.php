@@ -48,8 +48,8 @@ class OrderController extends AbstractController {
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'type' => 2]);
 
         //数字货币协议
-        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
-        $data['digital_currency_protocol'] = $digital_currency_protocol;
+        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol(['status' => 1]);
+
         //数字货币信息
         $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
         //用户虚拟钱包地址
