@@ -329,6 +329,10 @@ return [
         'en' => "Sorry, This channel does not support this amount, please select again",
         'hi' => 'खेद प्रकट करना! यह चैनल इस राशि का समर्थन नहीं करता, कृपया पुनः चुनें',
     ],
+    '280' => [ //抱歉,该区域暂不支持充值!
+        'en' => "Sorry, This area does not support recharge yet!",
+        'hi' => 'क्षमा करें, यह क्षेत्र रिचार्ज का समर्थन नहीं करता है!',
+    ],
 
     '3001' => [ // 区块游戏已存在
         'en' => "Block games already exist",

@@ -316,9 +316,9 @@ class AuthController extends AbstractController
         $uid = $this->GetUid();
 
         if($logintype == 4){ //黑名单处理
-            $filed_array = ['phone' =>$phone,'ip' => $ip];
+            $filed_array = ['phone' =>$phone,'ip' => $ip,'device_id' => $device_id];
         }else{
-            $filed_array = ['ip' => $ip];
+            $filed_array = ['ip' => $ip,'device_id' => $device_id];
         }
 
 

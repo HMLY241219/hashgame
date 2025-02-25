@@ -36,62 +36,24 @@ class OrderController extends AbstractController {
     public function principalSheetIndex(){
         $param = $this->request->all();
         $uid = $param['uid'];
-
-
-        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
-        if(!$userinfo){
-            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
-        }
+        $data = $this->payFiatCurrencyInfo($uid);
 
         $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
 
-        $data['total_pay_num'] = $userinfo['total_pay_num'];
-        //快捷的提现金额
-        [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
-
-        $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num"); //最低充值金额
-
+        $sysConfig = Common::getMore("bonus_pay_zs_water_multiple,cash_pay_water_multiple,below_the_pop_prompt,is_people_top,payment_reminder_status,withdraw_type_select,special_pay_types,pay_before_num,digital_currency_address"); //最低充值金额
 
 
         $data['payment_type'] = []; //普通充值
 
-        $payment_type = Db::connection('readConfig')->table('payment_type')->select('id','name','image','type','url','zs_bili','protocol_ids','first_zs_bonus_bili','zs_bonus_bili')->where('status',1)->orderBy('weight','desc')->get()->toArray();
-
-        //获取支付渠道
-
-        $data['defaultNewMoney'] = $data['defaultMoney'];
-
+        $payment_type = $this->PayService->getPaymentType(['status' => 1,'type' => 2]);
 
         //数字货币协议
-        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol();
+        $digital_currency_protocol = $this->PayService->getDigitalCurrencyProtocol(['status' => 1]);
 
-        foreach($payment_type as $key => $v){
-            //判断是否显示视频
-            if($key == 0  && $data['payType'] && !in_array($v['id'],$this->showVideoUrlPaymentId))$data['payType']['video_url'] = '';
-
-            if($v['image'])$v['image'] = Common::domain_name_path((string)$v['image']);
-            if ($v['type'] == 2){
-                $payment_type_array = explode(',',$v['protocol_ids']);
-                foreach ($digital_currency_protocol as $digital_currency){
-                    if(in_array($digital_currency['id'],$payment_type_array)){
-                        if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
-                        $v['pay_type_array'][] = $digital_currency;
-                    }
-                }
-                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($data['total_pay_num'],$v['zs_bili']);
-                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
-                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
-                $data['payment_type'][] = $v;
-            }else{
-
-                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($data['total_pay_num'],$v['zs_bili']);
-                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
-                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
-                $data['payment_type'][] = $v;
-            }
-        }
-
-
+        //数字货币信息
+        $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
+        //用户虚拟钱包地址
+        $data['user_wallet_address'] = Db::table('user_wallet_address')->selectRaw('id,address')->where('uid',$uid)->get()->toArray();
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
@@ -242,18 +204,21 @@ class OrderController extends AbstractController {
     public function OrderPay(){
 
         $uid = $this->request->post('uid');
-        $money   = $this->request->post('money') ?? 0;  //充值金额已分为单位
-        $pay_type_id   = $this->request->post('pay_id');  //充值金额已分为单位
+        $money   = $this->request->post('money') ?? 0;  //充值金额
+        $pay_type_id   = $this->request->post('pay_id');  //支付类型ID
         $active_id = $this->request->post('active_id') ?? 0; //活动ID
         $type = $this->request->post('type') ?? 0; //活动类型
         $payment_type_id = $this->request->post('payment_type_id') ?? 1; //活动类型
         $is_hand_enter = $this->request->post('is_hand_enter') ?? 0; //是否是手动输入金额 1=是,0=否
-        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
-        $protocol_money = $this->request->post('protocol_money') ?? 0; //数字货币金额
+        $currency = $this->request->post('currency') ?? 'VND'; //法币
+//        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
+
 
         $order_min_money = Common::getConfigValue("order_min_money");
         if(!$active_id && !$type && $money < $order_min_money) return $this->ReturnJson->failFul(228);  //抱歉，你的充值金额小于了最低充值金额
-
+        //获取货币比例
+        $currency_and_ratio = $this->PayService->getCurrencyAndRatio(['name' => $currency,'status' => 1],2,'bili',2);
+        if(!$currency_and_ratio)return $this->ReturnJson->failFul(280);  //抱歉,该区域暂不支持充值!
 
         $orderTime = $this->OrderStatusNum($uid);
         if($orderTime)return $this->ReturnJson->failFul(230);//对不起！ 您目前有太多订单需要支付。 请稍等一会后再拉取订单
@@ -303,7 +268,7 @@ class OrderController extends AbstractController {
 
 
             [$money,$zs_bonus,$get_money,$zs_money,$day] = $this->activeValue($active);
-
+            $pay_price = $money;
 //            if($money < $active['money']){
 //                return $this->ReturnJson->failFul(256);
 //            }
@@ -340,7 +305,7 @@ class OrderController extends AbstractController {
         $all_price = $share_strlog['total_pay_score'];
 
         //手续费
-        $fee = 0;
+        $fee = '0';
         if($pay_type['fee_bili'] && $pay_type['fee_bili'] > 0){    //比例手续费
             $fee = bcmul((string)$pay_type['fee_bili'],(string)$money,0);
         }
@@ -353,11 +318,11 @@ class OrderController extends AbstractController {
             "day"           => $day ,
             "ordersn"  => Common::doOrderSn(000),
             "paytype"       => $pay_type['name'],
-            "zs_bonus"      => $zs_bonus,
-            "zs_money"      => $zs_money,
-            "money"      => bcadd((string)$get_money,(string)$zs_money,0),
-            'get_money' => $get_money,
-            'price'    => $money,
+            "zs_bonus"      => $this->PayService->getFiatCryptoConversion((string)$zs_bonus,$currency_and_ratio['bili']),  //转换为U
+            "zs_money"      => $this->PayService->getFiatCryptoConversion((string)$zs_money,$currency_and_ratio['bili']),//转换为U
+            "money"      => $this->PayService->getFiatCryptoConversion(bcadd((string)$get_money,(string)$zs_money,0),$currency_and_ratio['bili']),//转换为U
+            'get_money' => $this->PayService->getFiatCryptoConversion((string)$get_money,$currency_and_ratio['bili']),//转换为U
+            'price'    => $this->PayService->getFiatCryptoConversion((string)$money,$currency_and_ratio['bili']),//转换为U
             'email'         => $email,
             'phone'        => $phone,
             'nickname'        => $phone,
@@ -366,12 +331,14 @@ class OrderController extends AbstractController {
             'active_id' => $active_id,
             'ip' => Common::getIp($this->request->getServerParams()), //正式
             'all_price' => $all_price,
-            'fee_money' => $fee,
+            'fee_money' => $this->PayService->getFiatCryptoConversion($fee,$currency_and_ratio['bili']),
             'current_money' => $current_money,
             'package_id' => $share_strlog['package_id'],
             'channel' => $share_strlog['channel'],
             'shop_id' => $shop_id ?? 0,
             'handshop_id' => $handshop_id ?? 0,
+            'pay_price' => $money,
+            'currency' => $currency,
         ];
 
         $order_id = Db::table('order')->insertGetId($createData);
@@ -393,14 +360,14 @@ class OrderController extends AbstractController {
             });
         }
         //数字货币充值
-        if($protocol_name){
-            $payment_type_type = Db::connection('readConfig')->table('payment_type')->where('id',$pay_type['payment_ids'])->value('type');
-            if($payment_type_type == 2){
-                $createData['protocol_name'] = $protocol_name; //协议名称
-                $createData['protocol_money'] = $protocol_money; //货币数量
-                $this->setOrderProtocol($order_id,$createData);
-            }
-        }
+//        if($protocol_name){
+//            $payment_type_type = Db::connection('readConfig')->table('payment_type')->where('id',$pay_type['payment_ids'])->value('type');
+//            if($payment_type_type == 2){
+//                $createData['protocol_name'] = $protocol_name; //协议名称
+//                $createData['protocol_money'] = $protocol_money; //货币数量
+//                $this->setOrderProtocol($order_id,$createData);
+//            }
+//        }
 
         $apInfo = $this->pay->pay($pay_type['name'],$createData,$baseUserInfo);
 
@@ -416,6 +383,7 @@ class OrderController extends AbstractController {
         return $this->ReturnJson->successFul(200, $apInfo['data']['payurl']);
 
     }
+
 
 
     /**
@@ -546,6 +514,7 @@ class OrderController extends AbstractController {
         $cash_money = $cash_money ? explode(' ',$cash_money) : [];
         $hot_config = $hot_config ? explode(' ',$hot_config) : [];
         $data = [];
+
         foreach ($defaultMoney as $key => $val){
             [$money,$bouns] = explode('|',$val);
             [,$cash_money_bili] = $cash_money ? explode('|',$cash_money[$key]) : ['0','0'];
@@ -556,6 +525,7 @@ class OrderController extends AbstractController {
                 'hot_status'  => $hot_status,
                 'cash_bili' => $cash_money_bili,
             ];
+
 
         }
         return [$data,$shop_id];
@@ -568,17 +538,16 @@ class OrderController extends AbstractController {
      */
     #[RequestMapping(path:'getRechargeConfiguration')]
     public function getRechargeConfiguration(){
-        $uid = $this->request->post('uid');
-        $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
-        if(!$userinfo){
-            $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
-        }
-
-        $this->getRechargeConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
+        return $this->ReturnJson->successFul(200, $this->payFiatCurrencyInfo($this->request->post('uid') ?? 0));
     }
 
 
-    private function payFiatInfo($uid){
+    /**
+     * 获取法币支付页面信息
+     * @param string|int $uid 用户id
+     * @return array
+     */
+    private function payFiatCurrencyInfo(string|int $uid){
         $currency = $this->request->post('currency') ?? 'VND';
         $userinfo = Db::table('userinfo')->select(Db::raw('total_pay_num,coin,total_pay_score,package_id,bonus'))->where('uid',$uid)->first();
         if(!$userinfo){
@@ -587,8 +556,45 @@ class OrderController extends AbstractController {
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
 
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
-        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1,$currency);
+        $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
+        $data['fiat_currency_payment_type'] = $this->getPaymentInfo($payment_type,$userinfo);  //法币支付方式
+        $data['userinfo'] = $userinfo;
         return $data;
+    }
+
+
+    /**
+     * 解析支付类型与赠送
+     * @param array $payment_type 支付类型
+     * @param array $userinfo  用户信息
+     * @param array $digital_currency_protocol 虚拟币协议
+     * @return array
+     */
+    private function getPaymentInfo(array $payment_type,array $userinfo,array $digital_currency_protocol = []){
+        $new_payment_type = [];
+        foreach($payment_type as $key => $v){
+            if($v['image'])$v['image'] = Common::domain_name_path((string)$v['image']);
+            if ($v['type'] == 2){
+                $payment_type_array = explode(',',$v['protocol_ids']);
+                foreach ($digital_currency_protocol as $digital_currency){
+                    if(in_array($digital_currency['id'],$payment_type_array)){
+                        if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
+                        $v['pay_type_array'][] = $digital_currency;
+                    }
+                }
+                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($userinfo['total_pay_num'],$v['zs_bili']);
+                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
+                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
+                $new_payment_type[] = $v;
+            }else{
+
+                $v['zs_bili'] = $this->getPaymentKhdTageSendBili($userinfo['total_pay_num'],$v['zs_bili']);
+                $v['first_zs_bonus_array'] = $this->getPaymentSendMoney($v['first_zs_bonus_bili']);
+                $v['zs_bonus_array'] = $this->getPaymentSendMoney($v['zs_bonus_bili']);
+                $new_payment_type[] = $v;
+            }
+        }
+        return $new_payment_type;
     }
 
 
@@ -609,45 +615,50 @@ class OrderController extends AbstractController {
         $shop_id = 0;
         $pt_pay_count_config = Common::getConfigValue('pt_pay_count') ?: 0;
 //        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0) && $this->getOrderIp((int)$uid)){  //首充充值商城判断  只能参加一次
-        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
-            if($marketing_shop){
+        try {
+            if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
+                if($marketing_shop){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }elseif($total_pay_score){//客损
+                $type_array = Db::connection('readConfig')->table('shop_log')->whereIn('type',[7,20])->where([['uid','=',$uid]])->pluck('type')->toArray();
+                $customer_where = [];
+                foreach ([7,20] as $val) if(!in_array($val,$type_array)) $customer_where[] = $val;
+
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1],['currency','=', $currency]])->orderBy('customer_money','desc')->first();
+                if($marketing_shop){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }
+            if(!isset($defaultMoney) && $total_pay_score){  //破产
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)],['currency','=', $currency]])->orderBy('weight','desc')->first();
+                if($marketing_shop && Db::table('shop_log')->where([['uid','=',$uid],['type','=',6]])->count() < $marketing_shop['num']){
+                    $defaultMoney = $marketing_shop['bonus_config'];
+                    $cash_money = $marketing_shop['cash_config'];
+                    $hot_config = $marketing_shop['hot_config'];
+                    $shop_id = $marketing_shop['id'];
+                }
+            }
+
+
+
+
+            if(!isset($defaultMoney)){
+                $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where([['status','=',1],['type','=',0],['user_type','=',$user_type],['currency','=', $currency]])->orderBy('weight','desc')->first();
                 $defaultMoney = $marketing_shop['bonus_config'];
                 $cash_money = $marketing_shop['cash_config'];
                 $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
             }
-        }elseif($total_pay_score){//客损
-            $type_array = Db::connection('readConfig')->table('shop_log')->whereIn('type',[7,20])->where([['uid','=',$uid]])->pluck('type')->toArray();
-            $customer_where = [];
-            foreach ([7,20] as $val) if(!in_array($val,$type_array)) $customer_where[] = $val;
-
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->whereIn('type',$customer_where)->where([['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['customer_money','<=',$customer_money],['status','=',1],['currency','=', $currency]])->orderBy('customer_money','desc')->first();
-            if($marketing_shop){
-                $defaultMoney = $marketing_shop['bonus_config'];
-                $cash_money = $marketing_shop['cash_config'];
-                $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
-            }
-        }
-        if(!isset($defaultMoney) && $total_pay_score){  //破产
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config,num')->where([['status','=',1],['type','=',6],['user_type','=',$user_type],['withdraw_bili','>=',$withdraw_bili],['coin_money','>=',bcadd((string)$coin,(string)$bonus,0)],['currency','=', $currency]])->orderBy('weight','desc')->first();
-            if($marketing_shop && Db::table('shop_log')->where([['uid','=',$uid],['type','=',6]])->count() < $marketing_shop['num']){
-                $defaultMoney = $marketing_shop['bonus_config'];
-                $cash_money = $marketing_shop['cash_config'];
-                $hot_config = $marketing_shop['hot_config'];
-                $shop_id = $marketing_shop['id'];
-            }
-        }
-
-
-
-
-        if(!isset($defaultMoney)){
-            $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('bonus_config,cash_config,hot_config')->where([['status','=',1],['type','=',0],['user_type','=',$user_type],['currency','=', $currency]])->orderBy('weight','desc')->first();
-            $defaultMoney = $marketing_shop['bonus_config'];
-            $cash_money = $marketing_shop['cash_config'];
-            $hot_config = $marketing_shop['hot_config'];
+        }catch (\Exception $e){
+            $this->logger->error('获取充值商城配置失败:'.$e->getMessage());
+            $this->logger->error('获取充值商城currency:'.$currency);
         }
 
         return [$defaultMoney,$cash_money,$hot_config,$shop_id];
@@ -663,17 +674,17 @@ class OrderController extends AbstractController {
      * @param  $package_id 包名
      * @param  $share_strlog 用户信息
      * @param  $payment_type_id 支付方式ID
-     * @param  $currency 货币
      * @param  $money 输入的金额
      * @return array
      */
-    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$currency = 'VND',$money = 0){
+    private function getNewPayType($package_id,$uid,$share_strlog,$payment_type_id = 1,$money = 0){
+        $currency = $this->request->post('currency') ?? 'VND';
         $withdrawConfig = Common::getMore('pay_before_num'); //充值前几次时匹配特定通道
 
         if($money && $money > 0){
-            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money],['currency','=',$currency]];
+            $where = [['status','=',1],['minmoney','<=',$money],['maxmoney','>=',$money],['currency','=',$currency],['type','=',1]];
         }else{
-            $where = [['status','=',1],['currency','=',$currency]];
+            $where = [['status','=',1],['currency','=',$currency],['type','=',1]];
         }
 
 
@@ -756,7 +767,7 @@ class OrderController extends AbstractController {
      * @return array
      */
     private function getPayType($pay_type_id,$money,$package_id,$uid,$share_strlog,$payment_type_id){
-
+        $currency = $this->request->post('currency') ?? 'VND';
 
         //如果客户端传入了支付通道，直接拿取使用
         if($pay_type_id){
@@ -776,7 +787,7 @@ class OrderController extends AbstractController {
 
         $pay_before_num = Common::getConfigValue('pay_before_num'); //充值前几次时匹配特定通道
 
-        $where = [['status','=',1]];
+        $where = [['status','=',1],['currency','=',$currency],['type','=',1]];
 
 
         $paymentWhere = '';
@@ -790,16 +801,7 @@ class OrderController extends AbstractController {
         $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids,$pay_before_num > $share_strlog['total_pay_num'] ? 1 : 0);
         if(!$pay_type_Array){
             $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
-            if(!$pay_type_Array){  //刷子帮如果没有匹配到通道走正常流程
-                $where = [['status','=',1]];
-                $pay_type_Array = $this->getPayTypeArray($where,$paymentWhere,(string)$money,$pay_type_ids);
-            }
             if(!$pay_type_Array){  //如果还是米有就直接在所有通道里面选择
-                $where = [['status','=',1]];
-                $notAllPackageId = $this->notAllPackageId;
-                if($notAllPackageId)foreach ($notAllPackageId as $item){
-                    $where[] = ['id','<>',$item];
-                }
                 $pay_type_Array = $this->getPayTypeArray($where,'',(string)$money,$pay_type_ids);
             }
             if(!$pay_type_Array)return ['code' => 227,'msg' => 'Sorry! No recharge channel has been matched yet','data' => []];
@@ -913,16 +915,20 @@ class OrderController extends AbstractController {
 
     /**
      * 获取支付方式赠送比例
-     * @param $payment_type_id 支付方式ID
-     * @param $money 充值金额
-     * @param $pt_pay_count 玩家支付次数
+     * @param $payment_type_id int|string|array 支付方式ID  或者where 条件
+     * @param  $money int|string 充值金额
+     * @param $pt_pay_count int|string 玩家支付次数
      * @return string
      */
-    private function paymentIdZsBonus($payment_type_id,$money,$pt_pay_count){
+    private function paymentIdZsBonus(int|string|array $payment_type_id,int|string $money,int|string $pt_pay_count){
         if($pt_pay_count <= 0){
-            $zs_bonus_str = Db::connection('readConfig')->table('payment_type')->where('id',$payment_type_id)->value('first_zs_bonus_bili');
+            $zs_bonus_str = is_array($payment_type_id)
+                ? $this->PayService->getPaymentType($payment_type_id,'first_zs_bonus_bili',2)['first_zs_bonus_bili']
+                : $this->PayService->getPaymentType(['id' => $payment_type_id],'first_zs_bonus_bili',2)['first_zs_bonus_bili'];
         }else{
-            $zs_bonus_str = Db::connection('readConfig')->table('payment_type')->where('id',$payment_type_id)->value('zs_bonus_bili');
+            $zs_bonus_str = is_array($payment_type_id)
+                ? $this->PayService->getPaymentType($payment_type_id,'zs_bonus_bili',2)['zs_bonus_bili']
+                : $this->PayService->getPaymentType(['id' => $payment_type_id],'zs_bonus_bili',2)['zs_bonus_bili'];
         }
         if(!$zs_bonus_str)return '0';
         $zs_bonus_array = $this->getPaymentSendMoney($zs_bonus_str);
@@ -1250,1156 +1256,6 @@ class OrderController extends AbstractController {
     }
 
 
-    /** rrpay 回调
-     */
-    #[RequestMapping(path:'rrpayNotify')]
-    public function rrpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('rrpay充值:'.json_encode($data));
-        $custOrderNo=$data['merchantOrderId'];
-        $reallyPayMoney = bcmul((string)($data['payAmount'] ?? 0),'100',0);
-        $ordStatus= $data["status"];
-        if(!$custOrderNo)return ;//订单信息错误
-        if($ordStatus == 1){  //订单回调1表示成功
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('rrpay充值事务处理失败:'.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-
-        return 'success';
-    }
-
-    /**
-     * serpay 支付回调
-     */
-    #[RequestMapping(path:'serpayNotify')]
-    public function serpayNotify() {
-        $data= $this->request->all();
-        $this->logger->error('serpay充值:'.json_encode($data));
-        $custOrderNo=$data['custOrderNo'];
-        $ordStatus= $data["ordStatus"];
-        $reallyPayMoney = $data['payAmt'];
-        if(!$custOrderNo)return '';//订单信息错误
-        if($ordStatus == 01){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return'SC000000';
-            }
-            $this->logger->error('serpay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-
-        return'SC000000';
-    }
-
-
-    /**
-     * tm_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'tmpayNotify')]
-    public function tmpayNotify(){
-        $data= $this->request->all();
-        $this->logger->error('tm_pay支付回调:'.json_encode($data));
-        $custOrderNo=$data['data']['mch_trade_no'] ?? '';
-        $trade_status=$data['data']['trade_status'] ?? '';
-        if($data['code'] != 0 || $trade_status != 'SUCC') return 'SUCC';
-
-
-        if(!$custOrderNo)return '';//订单信息错误
-
-        $reallyPayMoney = bcmul((string)($data['data']['amount'] ?? 0),'100',0);
-
-        $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-        if($res['code'] == 200){
-            return 'SUCC';
-        }
-        $this->logger->error('tm_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-        return '';
-    }
-
-
-
-    /**
-     *  waka_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'wakapayNotify')]
-    public function wakapayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('waka_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['order_no'];
-        $ordStatus= $data["status"];
-        $reallyPayMoney = bcmul((string)$data['order_realityamount'],'100',0);
-        if(!$custOrderNo)return '';//订单信息错误
-        if($ordStatus == 'success'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'ok' ;
-            }
-            $this->logger->error('waka_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-        return 'ok' ;
-    }
-
-
-
-    /**
-     *  fun_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'funpayNotify')]
-    public function funpayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('fun_pay充值:'.json_encode($data));
-        $custOrderNo=$data['merchantOrderId'];
-        $ordStatus= $data["status"];
-        $reallyPayMoney = $data['amount'];
-        if(!$custOrderNo)return '';//订单信息错误
-        if($ordStatus == 'TXN_SUCCESS'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success' ;
-            }
-            $this->logger->error('fun_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-
-        return 'success' ;
-    }
-
-
-    /**
-     *  go_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'gopayNotify')]
-    public function gopayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('go_pay充值:'.json_encode($data));
-        $ordStatus= $data["code"];
-        $custOrderNo=$data['data']['orderId'] ?? '';
-        if($ordStatus == 200){
-            $reallyPayMoney = $data['data']['amount'];
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS' ;
-            }
-            $this->logger->error('go_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-        return 'SUCCESS' ;
-    }
-
-
-    /**
-     *  eanishoppayNotify 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'eanishoppayNotify')]
-    public function eanishoppayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('eanishoppay充值:'.json_encode($data));
-        $ordStatus= $data["data"]['status'];
-        $custOrderNo=$data['data']['merchantTradeNo'] ?? '';
-        if($ordStatus == 'PAID'){
-            $reallyPayMoney = $data['data']['amount'];
-            $res = self::Orderhandle($custOrderNo,bcmul((string)$reallyPayMoney,'100',0));
-            if($res['code'] == 200){
-                return $this->response->json(['code' => 'OK']) ;
-            }
-            $this->logger->error('eanishoppay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return $this->response->json(['code' => 'FAIL']) ;
-        }
-        return $this->response->json(['code' => 'OK']) ;
-    }
-
-
-    /**
-     *  24hrpay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'hr24payNotify')]
-    public function hr24payNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('24hrpay充值:'.json_encode($data));
-        $ordStatus= $data["status"];
-        $custOrderNo=$data['mchOrderNo'] ?? '';
-        if($ordStatus == 2){
-            $reallyPayMoney = $data['amount'];
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('24hrpay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return 'SUCCESS';
-        }
-        return 'SUCCESS';
-    }
-
-
-
-    /**
-     *  ai_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'aipayNotify')]
-    public function aipayNotify(){
-        $data = $this->request->all();
-
-        $this->logger->error('ai_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['order_no'];
-        $ordStatus= $data["status"];
-        $reallyPayMoney = bcmul((string)$data['order_realityamount'],'100',0);
-        if(!$custOrderNo)return '';//订单信息错误
-        if($ordStatus == 'success'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'ok' ;
-            }
-            $this->logger->error('ai_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-            return '';
-        }
-        return 'ok' ;
-    }
-
-
-
-
-    /**
-     * x_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'xpayNotify')]
-    public function xpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('x_pay充值:'.json_encode($data));
-        $custOrderNo=$data['mchOrderNo'];
-        $ordStatus= $data["state"];
-
-        $reallyPayMoney = bcmul((string)$data['orderAmount'],'100',0);
-        if($ordStatus == 2){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('x_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * lets_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'letspayNotify')]
-    public function letspayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('lets_pay充值:'.json_encode($data));
-        $custOrderNo=$data['orderNo'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 2){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('lets_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * dragon_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'dragonpayNotify')]
-    public function dragonpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('dragon_pay充值:'.json_encode($data));
-        $custOrderNo=$data['orderId'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('dragon_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-    /**
-     * ant_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'antpayNotify')]
-    public function antpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('ant_pay充值:'.json_encode($data));
-        $transdata = urldecode($data['transdata']);
-
-        $transdata_arr = json_decode($transdata,true);
-        $custOrderNo=$transdata_arr['order_no'];
-        $ordStatus= $transdata_arr["payment"];
-
-        $reallyPayMoney = bcmul((string)$transdata_arr['order_amount'],'100',0);
-        if($ordStatus == '支付成功'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('ant_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * ff_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'ffpayNotify')]
-    public function ffpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('ff_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['mchOrderNo'];
-        $ordStatus= $data["tradeResult"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == '1'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('ff_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * cow_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'cowpayNotify')]
-    public function cowpayNotify() {
-        $data = $this->request->all();
-
-        $transdata = urldecode($data['transdata']);
-        $this->logger->error('cow_pay充值:'.$transdata);
-
-        $transdata_arr = json_decode($transdata,true);
-
-        $custOrderNo=$transdata_arr['order_no'];
-        $ordStatus= $transdata_arr["payment"];
-
-        $reallyPayMoney = bcmul((string)$transdata_arr['order_amount'],'100',0);
-        if($ordStatus == '支付成功'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('ant_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * wdd_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'wddpayNotify')]
-    public function wddpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('wdd_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderid'];
-        $ordStatus= $data["code"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == '0'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'OK';
-            }
-            $this->logger->error('wdd_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'OK';
-    }
-
-
-
-    /**
-     * timi_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'timipayNotify')]
-    public function timipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('timi_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['out_trade_no'];
-        $ordStatus= $data["code"];
-
-        $reallyPayMoney = bcmul((string)$data['pay_fee'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'ok';
-            }
-            $this->logger->error('timi_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'ok';
-    }
-
-
-    /**
-     * newfun_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'newfunpayNotify')]
-    public function newfunpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('newfun_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderNo'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = bcmul((string)$data['payAmount'],'100',0);
-        if($ordStatus == 'success'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('newfun_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'SUCCESS';
-    }
-
-
-
-    /**
-     * simply_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'simplypayNotify')]
-    public function simplypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('simply_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merOrderNo'];
-        $ordStatus= $data["orderStatus"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if(in_array($ordStatus,[2,3])){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('simply_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * lq_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'lqpayNotify')]
-    public function lqpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('lq_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderId'];
-        $ordStatus= $data["processStatus"];
-
-        $reallyPayMoney = $data['amount'];
-        if($ordStatus == 3){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return $this->response->json(['status' =>'success']);
-            }
-            $this->logger->error('lq_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return $this->response->json(['status' =>'success']);
-    }
-
-
-
-    /**
-     * threeq_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'threeqpayNotify')]
-    public function threeqpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('3q_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['mchOrderNo'];
-        $ordStatus= $data["state"];
-
-        $reallyPayMoney = $data['amount'];
-        if($ordStatus == 2){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('3q_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * show_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'showpayNotify')]
-    public function showpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('show_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['order_number'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = bcmul((string)$data['money'],'100',0);
-        if($ordStatus == 4){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('show_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * g_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'gpayNotify')]
-    public function gpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('g_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderNo'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('g_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * tata_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'tatapayNotify')]
-    public function tatapayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('tata_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderNo'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = (string)$data['amount'];
-        if($ordStatus == 2){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('tata_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return '';
-        }
-        return 'SUCCESS';
-    }
-
-    /**
-     * pay_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'paypayNotify')]
-    public function paypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('pay_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merOrderNo'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = (string)$data['payAmount'];
-        if($ordStatus == 'PAID'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney*100);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('pay_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * yh_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'yhpayNotify')]
-    public function yhpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('yh_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderNum'];
-        $ordStatus= $data["payResult"];
-
-        $reallyPayMoney = (string)$data['amount'];
-        if($ordStatus == '00'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return $this->response->json(['code' =>'200','msg' => '成功']);
-            }
-            $this->logger->error('yh_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return $this->response->json(['code' =>'200','msg' => '成功']);
-    }
-
-
-
-    /**
-     * newai_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'newaipayNotify')]
-    public function newaipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('newai_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['mchOrderNo'];
-        $ordStatus= $data["state"];
-
-        $reallyPayMoney = (string)$data['amount'];
-        if($ordStatus == '2'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('newai_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-    /**
-     * allin1_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'allin1payNotify')]
-    public function allin1payNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('allin1_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['app_order_no'];
-        $ordStatus= $data["success"];
-
-        $reallyPayMoney = bcmul((string)$data['pay_amount'],'100',0);
-        if($ordStatus == '1'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('allin1_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * make_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'makepayNotify')]
-    public function makepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('make_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderId'];
-        $ordStatus= $data["processStatus"];
-
-        $reallyPayMoney = bcmul((string)$data['realAmount'],'100',0);
-        if($ordStatus == '2'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'OK';
-            }
-            $this->logger->error('make_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'OK';
-    }
-
-    /**
-     * newai2_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'newai2payNotify')]
-    public function newai2payNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('newai2_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderId'];
-        $ordStatus= $data["status"];
-
-        $reallyPayMoney = (string)$data['amount'];
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('newai2_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-    /**
-     * best_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'bestpayNotify')]
-    public function bestpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('best_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderId'];
-        $ordStatus= $data["code"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('best_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-    /**
-     * zip_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'zippayNotify')]
-    public function zippayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('zip_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderId'];
-        $ordStatus= $data["code"];
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('zip_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     * upi_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'upipayNotify')]
-    public function upipayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('upi_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderId'];
-        $ordStatus= $data["status"];
-
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo, $data['amount']);
-            if($res['code'] == 200){
-                return 'OK';
-            }
-            $this->logger->error('upi_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'OK';
-    }
-
-
-
-    /**
-     * security_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'securitypayNotify')]
-    public function securitypayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('security_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderNum'];
-        $ordStatus= $data["status"];
-
-        if($ordStatus == 1 || $ordStatus == 4){
-            $res = self::Orderhandle($custOrderNo, bcmul((string)$data['truePayAmount'],'100',0));
-            if($res['code'] == 200){
-                return $this->response->json(['msg' => 'success'])->withStatus(200);
-            }
-            $this->logger->error('security_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return $this->response->json(['msg' => 'fail'])->withStatus(201);
-        }
-        return $this->response->json(['msg' => 'success'])->withStatus(200);
-    }
-
-
-    /**
-     * allin1two_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'allin1twopayNotify')]
-    public function allin1twopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('allin1two_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['app_order_no'];
-        $ordStatus= $data["success"];
-        $reallyPayMoney = bcmul((string)$data['pay_amount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('allin1two_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-    /**
-     *vendoo_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'vendoopayNotify')]
-    public function vendoopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('vendoo_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['data']['mchOrderNo'] ?? '';
-        $ordStatus= $data['data']['payState'] ?? '';
-        if(!$custOrderNo)return 'OK';
-        $reallyPayMoney = bcmul((string)$data['data']['realAmount'],'100',0);
-        if($ordStatus == 1){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'OK';
-            }
-            $this->logger->error('vendoo_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'OK';
-    }
-
-
-    /**
-     *rupeelink_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'rupeelinkpayNotify')]
-    public function rupeelinkpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('rupeelink_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['orderCode'] ?? '';
-        $ordStatus= $data['status'] ?? '';
-        if(!$custOrderNo)return 'success';
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 3){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('rupeelink_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-
-
-    /**
-     *unive_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'univepayNotify')]
-    public function univepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('unive_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['Traceno'] ?? '';
-        $ordStatus= $data['Status'] ?? '';
-        if(!$custOrderNo)return 'success';
-        $reallyPayMoney = bcmul((string)$data['Amount'],'100',0);
-        if($ordStatus == 'SUCCESS'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('unive_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'SUCCESS';
-    }
-
-
-    /**
-     *no_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'nopayNotify')]
-    public function nopayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('no_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data['state'] ?? '';
-        if(!$custOrderNo)return 'SUCCESS';
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-
-        $payMoney = $this->getOrderProtocol($custOrderNo,$reallyPayMoney);
-        if(!$payMoney)return;
-
-        if($ordStatus == 3){
-            $res = self::Orderhandle($custOrderNo,$payMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('no_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'SUCCESS';
-    }
-
-
-    /**
-     *ms_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'mspayNotify')]
-    public function mspayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('ms_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data['orderStatus'] ?? '';  //订单状态，代收失败回调状态为FAILED，代收成功回调状态可能为ARRIVED/SUCCESS/CLEARED中的一种
-        if(!$custOrderNo)return 'SUCCESS';
-        $reallyPayMoney = bcmul((string)$data['factAmount'],'100',0);
-        if(in_array($ordStatus,['ARRIVED','SUCCESS','CLEARED'])){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('ms_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'SUCCESS';
-    }
-
-
-    /**
-     *decent_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'decentpayNotify')]
-    public function decentpayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('decent_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['merchantOrderNo'] ?? '';
-        $ordStatus= $data['status'] ?? '';  //订单状态，代收失败回调状态为FAILED，代收成功回调状态可能为ARRIVED/SUCCESS/CLEARED中的一种
-        if(!$custOrderNo)return $this->response->json(['success' => true])->withStatus(200);
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 'received'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return $this->response->json(['success' => true])->withStatus(200);
-            }
-            $this->logger->error('decent_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return $this->response->json(['success' => false])->withStatus(201);
-        }
-        return $this->response->json(['success' => true])->withStatus(200);
-    }
-
-
-
-    /**
-     *fly_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'flypayNotify')]
-    public function flypayNotify() {
-        $data = $this->request->all();
-        $this->logger->error('fly_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['merchantOrderNum'] ?? '';
-        $ordStatus= $data['code'] ?? '';
-        if(!$custOrderNo)return 'SUCCESS';
-
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($ordStatus == 'SUCCESS'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('fly_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'FAIL';
-        }
-        return 'SUCCESS';
-    }
-
     /**
      *kk_pay 支付回调
      * @return false|string|void
@@ -2429,176 +1285,77 @@ class OrderController extends AbstractController {
 
 
 
-    /**
-     *tk_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'tkpayNotify')]
-    public function tkpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('tk_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['data']['order_id'] ?? '';
-        $ordStatus= $data['code'] ?? '';
-        if(!$custOrderNo)return 'SUCCESS';
-        $reallyPayMoney = (string)$data['data']['amount'];
-        if($ordStatus == 200){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 'SUCCESS';
-            }
-            $this->logger->error('tk_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'SUCCESS';
-    }
 
     /**
-     *kktwo_pay 支付回调
+     * 虚拟货币回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'kktwopayNotify')]
-    public function kktwopayNotify() {
+    #[RequestMapping(path:'cryptocurrencypayNotify')]
+    public function cryptocurrencypayNotify()
+    {
         $data = $this->request->all();
-
-        $this->logger->error('kktwo_pay充值:'.json_encode($data));
-
-
-        $custOrderNo=$data['partnerOrderNo'] ?? '';
-        $ordStatus= $data['status'] ?? '';
-        if(!$custOrderNo)return 0;
-        $reallyPayMoney = (string)$data['amount'];
-        if($ordStatus == '1'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return 0;
-            }
-            $this->logger->error('kktwo_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
+        $this->logger->error('虚拟币回调充值:'.json_encode($data));
+        if(!isset($data['txid']) || !$data['txid'])return 'ok';
+        $payData = \App\Service\BlockApi\BlockApiService::getTransactionInfo($data['txid']);
+        $this->logger->error('虚拟币回调解析充值数据:'.json_encode($payData));
+        $uid = Db::table('user_wallet_address')->where('address', $payData['from_address'])->value('uid');
+        if(!$uid){
+            $this->logger->error('钱包地址未找到用户:'.json_encode($payData));
+            return 'ok';
         }
-        return 0;
-    }
 
+        $pay_price = bcmul((string)$payData['amount'],'100',0); //支付金额
 
-
-    /**
-     *one_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'onepayNotify')]
-    public function onepayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('one_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['mchOrderNo'] ?? '';
-        $ordStatus = $data['orderStatus'] ?? '';
-        $status = $data['status'] ?? '';
-        if(!$custOrderNo)return $this->response->json(['success' => true])->withStatus(200);
-        $reallyPayMoney = bcmul((string)$data['amount'],'100',0);
-        if($status == 200 && $ordStatus == 'SUCCESS'){
-            $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
-            if($res['code'] == 200){
-                return $this->response->json(['success' => true])->withStatus(200);
+        if($payData['symbol'] != 'USDT'){  //不是U需要转换金额
+            $currency_and_ratio = $this->PayService->getCurrencyAndRatio(['name' => $payData['symbol']],2,'bili',2);
+            if(!$currency_and_ratio){
+                $this->logger->error('虚拟货币类型暂不支持:'.json_encode($payData));
+                return 'ok';
             }
-            $this->logger->error('one_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return $this->response->json(['success' => false])->withStatus(201);
+            //转换为U
+            $payData['amount'] = $this->PayService->getFiatCryptoConversion($pay_price,$currency_and_ratio['bili']);
+        }else{
+            $payData['amount'] = $pay_price;
+            $currency_and_ratio['bili'] = 1;
         }
-        return $this->response->json(['success' => true])->withStatus(200);
+
+
+        $userinfo = Db::table('userinfo')->selectRaw('total_pay_num,package_id,total_pay_score,channel')->where('uid',$uid)->first();
+        //U赠送的赠送Bonus金额
+        $payment_id_zs_bonus = $this->paymentIdZsBonus(['status' => 1,'currency' => $payData['symbol']],$pay_price, $userinfo['total_pay_num']);
+
+        $createData = [
+            "uid"           => $uid,
+            "day"           => 0 ,
+            "ordersn"  => $data['txid'],
+            "paytype"       => $payData['symbol'],
+            "zs_bonus"      => $this->PayService->getFiatCryptoConversion($payment_id_zs_bonus,$currency_and_ratio['bili']),  //转换为U
+            "zs_money"      => 0,//转换为U
+            "money"      => $this->PayService->getFiatCryptoConversion($payment_id_zs_bonus,$currency_and_ratio['bili']),//转换为U
+            'get_money' => $payData['amount'],//转换为U
+            'price'    => $payData['amount'],//转换为U
+            'email'         => '',
+            'phone'        => '',
+            'nickname'        => '',
+            'createtime' => time(),
+            'packname' => '',
+            'active_id' => 0,
+            'ip' => '', //正式
+            'all_price' => $userinfo['total_pay_score'],
+            'fee_money' => 0,
+            'current_money' => 0,
+            'package_id' => $userinfo['package_id'],
+            'channel' => $userinfo['channel'],
+            'shop_id' => 0,
+            'handshop_id' => 0,
+            'pay_price' => $pay_price,
+            'currency' => $payData['symbol'],
+        ];
+
+        Db::table('order')->insert($createData);
+        $this->Orderhandle($data['txid'],$pay_price);
+        return 'ok';
     }
-
-
-
-
-    /**
-     *global_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'globalpayNotify')]
-    public function globalpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('global_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['mchOrderNo'] ?? '';
-        $ordStatus = $data['status'] ?? '';
-
-        if(!$custOrderNo)return 'success';
-
-        if($ordStatus == 'PAID'){
-            $res = self::Orderhandle($custOrderNo,$data['amount']);
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('global_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
-
-
-    /**
-     *a777_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'a777payNotify')]
-    public function a777payNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('a777_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['merchant_order_id'] ?? '';
-        $ordStatus = $data['order_status'] ?? '';
-
-        if(!$custOrderNo)        return $this->response->json(['success' => true])->withStatus(200);
-
-        if($ordStatus == 'PAY_SUCCESS'){
-            $res = self::Orderhandle($custOrderNo,bcmul((string)$data['account_amount'],'100',0));
-            if($res['code'] == 200){
-                return $this->response->json(['success' => true])->withStatus(200);
-            }
-            $this->logger->error('a777_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return $this->response->json(['success' => false])->withStatus(201);
-        }
-        return $this->response->json(['success' => true])->withStatus(200);
-    }
-
-
-    /**
-     *masat_pay 支付回调
-     * @return false|string|void
-     */
-    #[RequestMapping(path:'masatpayNotify')]
-    public function masatpayNotify() {
-        $data = $this->request->all();
-
-        $this->logger->error('masat_pay充值:'.json_encode($data));
-
-        $custOrderNo=$data['orderNumber'] ?? '';
-        $ordStatus = $data['orderStatus'] ?? '';
-
-        if(!$custOrderNo)         return 'success';
-
-        if($ordStatus == '3'){
-            $res = self::Orderhandle($custOrderNo,bcmul((string)$data['amount'],'100',0));
-            if($res['code'] == 200){
-                return 'success';
-            }
-            $this->logger->error('masat_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
-
-            return 'fail';
-        }
-        return 'success';
-    }
-
 
 
     /**
@@ -2616,7 +1373,7 @@ class OrderController extends AbstractController {
             return ['code' => '200','msg' => '支付成功','data' => []];
         }
 
-        if($order['price'] > $reallyPayMoney){
+        if($order['pay_price'] > $reallyPayMoney){
             $this->logger->error('支付金额不对小于实际支付金额直接返回-订单号:'.$ordersn);
             return ['code' => '200','msg' => '支付金额不对小于实际支付金额直接返回','data' => []];
         }
