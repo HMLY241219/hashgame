@@ -934,28 +934,53 @@ class WithdrawlogController extends AbstractController {
 
     }
 
+    /**
+     * no_pay提现回调
+     * @return string|void
+     */
+    #[RequestMapping(path:'nopayNotify')]
+    public function nopayNotify() {
+        $data = $this->request->all();
+
+        $this->logger->error('no_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
+
+        $ordersn=$data['merchantOrderNo'] ?? '';
+        $ordStatus= $data["state"] ?? '';
+
+
+        $status = $ordStatus == '3' ? 1 : 2;
+        $res = $this->Withdrawhandle($ordersn,$status,$data);
+
+        if($res['code'] == 200){
+            return 'SUCCESS';
+        }
+        $this->logger->error('no_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
+        return 'SUCCESS';
+    }
 
 
     /**
-     * rrpay提现回调
+     * qf888_pay提现回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'rrpayNotify')]
-    public function rrpayNotify() {
+    #[RequestMapping(path:'qf888payNotify')]
+    public function qf888payNotify() {
         $data = $this->request->all();
 
-        $this->logger->error('rrpay提现:'.json_encode($data));
-        $ordersn =$data['merchantOrderId'];
-        $status = $data["status"];  // 1 成功 2 失败
-        if(!$ordersn)return '';//订单信息错误
+        $this->logger->error('qf888_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));
+        $ordersn =$data['mchOrderId'];
+        $status = $data["isPaid"];  // 1 成功 2 失败
+        if(!$ordersn)return 'success';//订单信息错误
+        $status = $status == '1' ? 1 : 2;
         $res = $this->Withdrawhandle($ordersn,$status,$data);
 
         if($res['code'] == 200){
             return "success";
         }
-        $this->logger->error('rrpay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
+        $this->logger->error('qf888_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
+        return 'success';
     }
+
 
 
 

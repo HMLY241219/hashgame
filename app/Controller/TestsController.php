@@ -43,7 +43,8 @@ class TestsController extends AbstractController
 
     public function index()
     {
-        return QrcodeCommon::generateQrCodeBase64(1111);
+        return config('withdrawbankcode.vnd.qf888_pay')['VietinBank'];
+        return QrcodeCommon::generateQrCodeBase64('1111');
         return 555;
 
     }

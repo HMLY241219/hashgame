@@ -60,9 +60,7 @@ class Withdraw{
     public function no_pay($withdrawlog,$type){
 
         $data   = [
-            "mchId" => $this->qf888pay_mchid,
-            "mchOrderId" => $withdrawlog['ordersn'],
-
+            "merchantOrderNo" => $withdrawlog['ordersn'],
             "merchantMemberNo" => $withdrawlog['uid'],
             "amount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
             "coin" => 'USDT',
@@ -108,9 +106,6 @@ class Withdraw{
     }
 
 
-
-
-
     /**
      * qf888_pay
      * @param $withdrawlog 用户提现数据
@@ -122,32 +117,25 @@ class Withdraw{
         }
 
         $data = [
-            "merchantNo"      => $this->mspay_merchantNo,
-            "merchantOrderNo" => $withdrawlog['ordersn'],
-            'description' =>  '3377WIN',
-            "payAmount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
-            "mobile"  =>  $withdrawlog['phone'],
-            "email"  =>  $withdrawlog['email'],
-            'bankNumber' => $withdrawlog['bankaccount'],
-            'bankCode' => $withdrawlog['ifsccode'],
-            'bankName' => 'BANK',
-            'accountHoldName' => $withdrawlog['backname'],
-            'notifyUrl' =>  $this->getNotifyUrl($this->mspay_notifyUrl)  ,
-
+            "mchId"      => $this->qf888pay_mchid,
+            "mchOrderId" => $withdrawlog['ordersn'],
+            "bankCode" => $withdrawlog['ifsccode'],
+            'bankAccount' => $withdrawlog['bankaccount'],
+            'bankOwner' => str_replace(' ', '', $withdrawlog['backname']),
+            "amount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
+            'notifyUrl' =>  $this->getNotifyUrl($this->qf888pay_backUrl)  ,
         ];
-
-        $signStr = Sign::dataString($data);
-        $data['sign']  = md5(md5($signStr.'&').$this->mspay_Key);
+        $data['sign'] = Sign::asciiKeyStrtolowerSign($data,$this->qf888pay_key,'sign');
 
         try {
-            $response = $this->guzzle->post($this->mspay_url,$data,$this->zr_header);
+            $response = $this->guzzle->post($this->qf888pay_url,$data,$this->zr_header);
         }catch (\Exception $e){
             $response = ['Request timed out'];
         }
 
-        if (isset($response['status']) && $response['status'] == 200){
+        if (isset($response['code']) && $response['code'] == 200){
 
-            return ['code' => 200 , 'msg' => '' , 'data' => $response['data']['platOrderNo']];
+            return ['code' => 200 , 'msg' => '' , 'data' => 'suc'];
         }
 
         Common::log($withdrawlog['ordersn'],$response,$type);
@@ -155,6 +143,7 @@ class Withdraw{
 
         return ['code' => 201 , 'msg' => $msg , 'data' => []];
     }
+
 
 
 
