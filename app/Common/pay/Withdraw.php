@@ -115,11 +115,15 @@ class Withdraw{
         if($withdrawlog['type'] != 1){
             return ['code' => 201 , 'msg' => 'Sorry! Only bank cards are supported' , 'data' => []];
         }
-
+        $bankCode = config('withdrawbankcode.vnd.qf888_pay')[$withdrawlog['ifsccode']] ?? '';
+        if(!$bankCode){
+            $this->logger->error('qf888_pay代付-BackCode获取失败-ordersn：'.$withdrawlog['ordersn']);
+            return ['code' => 201 , 'msg' => 'BackCode获取失败' , 'data' => []];
+        }
         $data = [
             "mchId"      => $this->qf888pay_mchid,
             "mchOrderId" => $withdrawlog['ordersn'],
-            "bankCode" => $withdrawlog['ifsccode'],
+            "bankCode" => $bankCode,
             'bankAccount' => $withdrawlog['bankaccount'],
             'bankOwner' => str_replace(' ', '', $withdrawlog['backname']),
             "amount"  =>  bcdiv((string)$withdrawlog['really_withdraw_money'],'100',2),
