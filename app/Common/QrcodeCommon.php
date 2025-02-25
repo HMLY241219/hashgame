@@ -7,13 +7,16 @@ use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\Color\Color;
-use Endroid\QrCode\Logo\Logo;
 class QrcodeCommon {
 
-
-    public static function generateQrCodeBase64($data)
+    /**
+     * 生成二维码图片转成base64
+     * @param string $info 内容
+     * @return string
+     */
+    public static function generateQrCodeBase64(string $info)
     {
-        $qrCode = QrCode::create($data)
+        $qrCode = QrCode::create($info)
             ->setEncoding(new Encoding('UTF-8'))
             ->setErrorCorrectionLevel(ErrorCorrectionLevel::High)
             ->setSize(300)
