@@ -30,7 +30,9 @@ class Withdraw{
     //qf888_pay
     private string $qf888pay_url = "https://www.qf888.vip/api/behalfPay/bill";//下单地址
     private string $qf888pay_mchid = "1637576";//商户编码
+//    private string $qf888pay_mchid = "1693915";//正式
     private string $qf888pay_key = "647188ab09b5875d452b46e6310abe76";//商户密钥的值
+//    private string $qf888pay_key = "d94d1b3f92b5ddcdb91f74469522d761";//正式
     private string $qf888pay_backUrl = "qf888payNotify";//回调地址
 
 
