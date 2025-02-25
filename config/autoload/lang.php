@@ -402,4 +402,8 @@ return [
         'en' => "Block transaction information is not found",
         'hi' => '',
     ],
+    '3018' => [ // 当前钱包地址已被绑定
+        'en' => "The current wallet address is already bound",
+        'hi' => '',
+    ],
 ];

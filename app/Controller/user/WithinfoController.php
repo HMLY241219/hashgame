@@ -46,7 +46,11 @@ class WithinfoController extends AbstractController {
 
         if(in_array($type,[3,4])){
             $wallet_address_id = $this->addUserWalletAddress($uid,$type);
-            return $this->ReturnJson->successFul(200,$wallet_address_id);
+            if ($wallet_address_id === false) {
+                return $this->ReturnJson->failFul(3018);
+            } else {
+                return $this->ReturnJson->successFul(200,$wallet_address_id);
+            }
         }
 
         $account = trim(base64_decode($this->request->post('account')));  //账户信息
@@ -153,10 +157,12 @@ class WithinfoController extends AbstractController {
     public function addUserWalletAddress($uid,$type){
         $address = trim($this->request->post('address'));
         $protocol_name = $this->request->post('protocol_name') ?? '';
-        $wallet_address = Db::table('user_wallet_address')->where(['uid' => $uid, 'address' => $address, 'type' => $type])->first();
+//        $wallet_address = Db::table('user_wallet_address')->where(['uid' => $uid, 'address' => $address, 'type' => $type])->first();
+        $wallet_address = Db::table('user_wallet_address')->where(['address' => $address])->first();
         if($wallet_address){
-            Db::table('user_wallet_address')->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
-            $wallet_address_id = $wallet_address['id'];
+//            Db::table('user_wallet_address')->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
+//            $wallet_address_id = $wallet_address['id'];
+            return false;
         }else{
             $wallet_address_id = Db::table('user_wallet_address')->insertGetId(['uid' => $uid,'type' =>$type,'address' => $address,'protocol_name' => $protocol_name]);
 
