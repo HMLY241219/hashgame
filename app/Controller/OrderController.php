@@ -1257,30 +1257,30 @@ class OrderController extends AbstractController {
 
 
     /**
-     *kk_pay 支付回调
+     *qf888_pay 支付回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'kkpayNotify')]
-    public function kkpayNotify() {
+    #[RequestMapping(path:'qf888payNotify')]
+    public function qf888payNotify() {
         $data = $this->request->all();
 
-        $this->logger->error('kk_pay充值:'.json_encode($data));
+        $this->logger->error('qf888_pay充值:'.json_encode($data));
 
 
-        $custOrderNo=$data['partnerOrderNo'] ?? '';
-        $ordStatus= $data['status'] ?? '';
-        if(!$custOrderNo)return 0;
-        $reallyPayMoney = (string)$data['amount'];
+        $custOrderNo=$data['mchOrderId'] ?? '';
+        $ordStatus= $data['isPaid'] ?? '';
+        if(!$custOrderNo)return 'success';
+        $reallyPayMoney = bcmul((string)$data['payAmount'],'100',0);
         if($ordStatus == '1'){
             $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
             if($res['code'] == 200){
-                return 0;
+                return 'success';
             }
-            $this->logger->error('kk_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
+            $this->logger->error('qf888_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
 
             return 'fail';
         }
-        return 0;
+        return 'success';
     }
 
 

@@ -69,7 +69,7 @@ class Pay{
         $data = [
             "mchId" => $this->qf888pay_mchid,
             "mchOrderId" => $createinfo['ordersn'],
-            "amount" => bcdiv((string)$createinfo['price'],'100',0),
+            "amount" => bcdiv((string)$createinfo['pay_price'],'100',0),
             "payMethod" => 'VNBANKQR',  //VNBANKQR2  //越南ZALO pay VNZALO 已开启 越南MOMO pay VNMOMO 已开启 越南ViettelPay VNVTPAY 已开启
             "notifyUrl" => $this->getNotifyUrl($this->qf888pay_backUrl),
         ];
