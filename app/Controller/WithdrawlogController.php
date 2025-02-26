@@ -310,7 +310,7 @@ class WithdrawlogController extends AbstractController {
         $withdraw_type_id   = $this->request->post('withdraw_id_type_id') ?? 0;  //提现通道ID
         $refundmethod_type_id = $this->request->post('refundmethod_type_id') ?? 1; //退款方式ID:1=银行卡,2=UPI,3=钱包,4=数字货币
         $currency = $this->request->post('currency') ?? 'VND'; //货币
-        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
+
 
 
 
@@ -391,6 +391,7 @@ class WithdrawlogController extends AbstractController {
             //用户提现信息判断
             $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
+            $user_withinfo['protocol_name'] = '';
         }
 
         //用户提现平台判断
@@ -502,7 +503,7 @@ class WithdrawlogController extends AbstractController {
             $this->setUserWithdrawLogInfo($userinfo,(int)$money);
             return $this->ReturnJson->successFul();
         }
-        $data['protocol_name'] = $protocol_name;
+        $data['protocol_name'] = $user_withinfo['protocol_name'];
         $data['jianame'] = $userinfo['jianame'];
         $apInfo = $this->withdraw->withdraw($data,$data['withdraw_type'],2);
         if($apInfo['code'] != 200) return $this->ReturnJson->failFul(246);
