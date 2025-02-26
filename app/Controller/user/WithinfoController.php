@@ -185,13 +185,14 @@ class WithinfoController extends AbstractController {
     public function addPayAndWtihdrawWalletAddress(string $table,string|int $uid,int $type = 1){
         $address = trim($this->request->post('address'));
         $protocol_name = $this->request->post('protocol_name') ?? '';
-        $wallet_address = match ($type){
-            1 => Db::table($table)->where(['address' => $address])->first(),
-            2 => Db::table($table)->where(['uid' => $uid,'address' => $address])->first(),
-        };
+
+        $wallet_address = Db::table($table)->where(['uid' => $uid])->first();
 
         if($wallet_address){
-            if($type == 1 && $wallet_address['uid'] != $uid)return false;
+            if($type == 1){
+                $wallet_address = Db::table($table)->where(['address' => $address])->value('uid');
+                if($wallet_address)return false;
+            }
             Db::table($table)->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
             $wallet_address_id = $wallet_address['id'];
         }else{
