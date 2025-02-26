@@ -50,7 +50,6 @@ class WithinfoController extends AbstractController {
                 2 => $this->addPayAndWtihdrawWalletAddress('pay_wallet_address',$uid), //充值钱包
                 3 => $this->addPayAndWtihdrawWalletAddress('withdraw_wallet_address',$uid,2), //退款钱包
             };
-            $wallet_address_id = $this->addUserWalletAddress($uid,$type);
             if ($wallet_address_id === false) {
                 return $this->ReturnJson->failFul(3018);
             } else {
