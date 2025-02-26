@@ -159,7 +159,7 @@ class WithdrawlogController extends AbstractController {
         foreach ($user_withinfo as &$v){
             if(!isset($data['user_withinfo'][$v['type']]))$data['user_withinfo'][$v['type']] = $v;
         }
-        $user_wallet_address =  $this->PayService->getUserWalletAddressInfo(['uid' => $uid]);
+        $user_wallet_address =  $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid]);
         if($user_wallet_address)foreach ($user_wallet_address as $wallet){
             $data['user_withinfo'][$wallet['type']] = $wallet;
         }
@@ -388,7 +388,7 @@ class WithdrawlogController extends AbstractController {
             $user_withinfo['phone'] = '';
         }else{
             //用户提现信息判断
-            $user_withinfo = $this->PayService->getUserWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
+            $user_withinfo = $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
         }
 

@@ -52,8 +52,9 @@ class OrderController extends AbstractController {
 
         //数字货币信息
         $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
+
         //用户虚拟钱包地址
-        $data['user_wallet_address'] = Db::table('user_wallet_address')->selectRaw('id,address')->where('uid',$uid)->get()->toArray();
+        $data['user_wallet_address'] = $this->PayService->getPayWalletAddressInfo(['uid' => $uid],'id,address',2);
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
@@ -1298,8 +1299,8 @@ class OrderController extends AbstractController {
         if(!isset($data['txid']) || !$data['txid'])return 'ok';
         $payData = \App\Service\BlockApi\BlockApiService::getTransactionInfo($data['txid']);
         $this->logger->error('虚拟币回调解析充值数据:'.json_encode($payData));
-        $uid = Db::table('user_wallet_address')->where('address', $payData['from_address'])->value('uid');
-        if(!$uid){
+        $PayWalletAddress = $this->PayService->getPayWalletAddressInfo(['address' => $payData['from_address']],'uid',2);
+        if(!$PayWalletAddress){
             $this->logger->error('钱包地址未找到用户:'.json_encode($payData));
             return 'ok';
         }
@@ -1320,12 +1321,12 @@ class OrderController extends AbstractController {
         }
 
 
-        $userinfo = Db::table('userinfo')->selectRaw('total_pay_num,package_id,total_pay_score,channel')->where('uid',$uid)->first();
+        $userinfo = Db::table('userinfo')->selectRaw('total_pay_num,package_id,total_pay_score,channel')->where('uid',$PayWalletAddress['uid'])->first();
         //U赠送的赠送Bonus金额
         $payment_id_zs_bonus = $this->paymentIdZsBonus(['status' => 1,'currency' => $payData['symbol']],$pay_price, $userinfo['total_pay_num']);
 
         $createData = [
-            "uid"           => $uid,
+            "uid"           => $PayWalletAddress['uid'],
             "day"           => 0 ,
             "ordersn"  => $data['txid'],
             "paytype"       => $payData['symbol'],

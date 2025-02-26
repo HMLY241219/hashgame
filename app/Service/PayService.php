@@ -161,6 +161,54 @@ class PayService extends BaseService
 
 
     /**
+     * 充值钱包地址
+     * @param array $where  条件
+     * @param string $field 字段
+     * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
+     * @return void
+     */
+    public function getPayWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name',int $selectType = 1){
+        $query = Db::connection('readConfig')
+            ->table('pay_wallet_address')
+            ->selectRaw($field)
+            ->where($where);
+
+        return match ($selectType){
+            1 => $query->get()
+                ->toArray(),
+            2 => $query->first(),
+
+        };
+    }
+
+
+
+
+    /**
+     * 退款钱包地址
+     * @param array $where  条件
+     * @param string $field 字段
+     * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
+     * @return void
+     */
+    public function getWithdrawWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name',int $selectType = 1){
+        $query = Db::connection('readConfig')
+            ->table('withdraw_wallet_address')
+            ->selectRaw($field)
+            ->where($where);
+
+        return match ($selectType){
+            1 => $query->get()
+                ->toArray(),
+            2 => $query->first(),
+
+        };
+    }
+
+
+
+
+    /**
      * 获取数字货币与U的相互转换
      * @param string $money  法币或U
      * @param int|float $bili  转换比例
