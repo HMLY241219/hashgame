@@ -43,8 +43,13 @@ class WithinfoController extends AbstractController {
     public function add(){
         $type = $this->request->post('type') ?: 1; //类型:1=银行卡,2=UPI,3=钱包,4=数字货币
         $uid = $this->request->post('uid');
-
+        $wallet_address_type = $this->request->post('wallet_address_type') ?? 1;//1=user_wallet_address,2=pay_wallet_address,3=withdraw_wallet_address
         if(in_array($type,[3,4])){
+            $wallet_address_id = match ((int)$wallet_address_type){
+                1 => $this->addUserWalletAddress($uid,$type),
+                2 => $this->addPayAndWtihdrawWalletAddress('pay_wallet_address',$uid), //充值钱包
+                3 => $this->addPayAndWtihdrawWalletAddress('withdraw_wallet_address',$uid,2), //退款钱包
+            };
             $wallet_address_id = $this->addUserWalletAddress($uid,$type);
             if ($wallet_address_id === false) {
                 return $this->ReturnJson->failFul(3018);
@@ -157,7 +162,7 @@ class WithinfoController extends AbstractController {
     public function addUserWalletAddress($uid,$type){
         $address = trim($this->request->post('address'));
         $protocol_name = $this->request->post('protocol_name') ?? '';
-//        $wallet_address = Db::table('user_wallet_address')->where(['uid' => $uid, 'address' => $address, 'type' => $type])->first();
+
         $wallet_address = Db::table('user_wallet_address')->where(['address' => $address])->first();
         if($wallet_address){
 //            Db::table('user_wallet_address')->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
@@ -166,6 +171,32 @@ class WithinfoController extends AbstractController {
         }else{
             $wallet_address_id = Db::table('user_wallet_address')->insertGetId(['uid' => $uid,'type' =>$type,'address' => $address,'protocol_name' => $protocol_name]);
 
+        }
+        return $wallet_address_id;
+    }
+
+
+    /**
+     * 添加充值与退款的钱包地址
+     * @param string $table  钱包表
+     * @param string|int $uid  用户ID
+     * @param int $type 类型 1：用钱包地址判断是否能继续添加 , 2= 根据用户加钱包地址判断是否添加还是修改
+     * @return false|int
+     */
+    public function addPayAndWtihdrawWalletAddress(string $table,string|int $uid,int $type = 1){
+        $address = trim($this->request->post('address'));
+        $protocol_name = $this->request->post('protocol_name') ?? '';
+        $wallet_address = match ($type){
+            1 => Db::table($table)->where(['address' => $address])->first(),
+            2 => Db::table($table)->where(['uid' => $uid,'address' => $address])->first(),
+        };
+
+        if($wallet_address){
+            if($type == 1 && $wallet_address['uid'] != $uid)return false;
+            Db::table($table)->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
+            $wallet_address_id = $wallet_address['id'];
+        }else{
+            $wallet_address_id = Db::table($table)->insertGetId(['uid' => $uid,'type' =>$type,'address' => $address,'protocol_name' => $protocol_name]);
         }
         return $wallet_address_id;
     }
