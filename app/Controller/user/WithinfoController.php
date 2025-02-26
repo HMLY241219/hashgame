@@ -190,8 +190,8 @@ class WithinfoController extends AbstractController {
 
         if($wallet_address){
             if($type == 1){  //充值的话一个地址只能对应一个用户
-                $wallet_address = Db::table($table)->where(['address' => $address])->value('uid');
-                if($wallet_address)return false;
+                $wallet_address_status = Db::table($table)->where(['address' => $address])->value('uid');
+                if($wallet_address_status)return false;
             }
             Db::table($table)->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
             $wallet_address_id = $wallet_address['id'];
