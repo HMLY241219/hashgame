@@ -580,6 +580,7 @@ class OrderController extends AbstractController {
                 foreach ($digital_currency_protocol as $digital_currency){
                     if(in_array($digital_currency['id'],$payment_type_array)){
                         if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
+                        if($digital_currency['digital_currency_url'])$digital_currency['digital_currency_url'] = Common::domain_name_path((string)$digital_currency['digital_currency_url']);
                         $v['pay_type_array'][] = $digital_currency;
                     }
                 }

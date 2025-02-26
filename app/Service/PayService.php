@@ -82,9 +82,10 @@ class PayService extends BaseService
      * @param string $field
      * @return mixed[]
      */
-    public function getDigitalCurrencyProtocol(array $where = [],string $field = 'id,englishname,icon,name,min_money,max_money,digital_currency_address'){
+    public function getDigitalCurrencyProtocol(array $where = [],string $field = 'id,englishname,icon,name,min_money,max_money,digital_currency_address,digital_currency_url'){
         return Db::connection('readConfig')
             ->table('digital_currency_protocol')
+            ->where($where)
             ->selectRaw($field)
             ->get()
             ->toArray();
