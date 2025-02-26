@@ -383,13 +383,13 @@ class WithdrawlogController extends AbstractController {
 
         //钱包与数字货币
         if(in_array($refundmethod_type_id,[3,4])){
-            $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
+            $user_withinfo = $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
             $user_withinfo['email'] = '';
             $user_withinfo['phone'] = '';
         }else{
             //用户提现信息判断
-            $user_withinfo = $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
+            $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
         }
 
