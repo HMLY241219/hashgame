@@ -168,7 +168,7 @@ class PayService extends BaseService
      * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
      * @return void
      */
-    public function getPayWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name',int $selectType = 1){
+    public function getPayWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name,type',int $selectType = 1){
         $query = Db::connection('readConfig')
             ->table('pay_wallet_address')
             ->selectRaw($field)
@@ -192,7 +192,7 @@ class PayService extends BaseService
      * @param int $selectType  查询类型 ： 1= 查询多个数据  ，2= 查询单个数据
      * @return void
      */
-    public function getWithdrawWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name',int $selectType = 1){
+    public function getWithdrawWalletAddressInfo(array $where = [],string $field = 'id,address,protocol_name,type',int $selectType = 1){
         $query = Db::connection('readConfig')
             ->table('withdraw_wallet_address')
             ->selectRaw($field)
