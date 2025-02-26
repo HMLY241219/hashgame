@@ -195,7 +195,7 @@ class WithinfoController extends AbstractController {
             Db::table($table)->where(['id' => $wallet_address['id']])->update(['address' => $address,'protocol_name' => $protocol_name]);
             $wallet_address_id = $wallet_address['id'];
         }else{
-            $wallet_address_id = Db::table($table)->insertGetId(['uid' => $uid,'type' =>$type,'address' => $address,'protocol_name' => $protocol_name]);
+            $wallet_address_id = Db::table($table)->insertGetId(['uid' => $uid,'address' => $address,'protocol_name' => $protocol_name]);
         }
         return $wallet_address_id;
     }
