@@ -100,7 +100,7 @@ class WithdrawlogController extends AbstractController {
         $data['with_money_config'] = explode('|',$withConfig['with_money_config']); //系统最大退款金额
         $data['withdraw_fee_bili'] = $withConfig['withdraw_fee_bili']; //退款手续费比例
         $data['withdraw_fee_amount'] = $withConfig['withdraw_fee_amount']; //退款手续费固定值
-
+        $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
 
         $data['withdraw_info'] = $this->withdrawFiatCurrencyInfo($uid);
 
