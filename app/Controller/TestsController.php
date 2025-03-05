@@ -22,6 +22,7 @@ use function Hyperf\Coroutine\parallel;
 use Hyperf\Guzzle\ClientFactory;
 use Hyperf\Amqp\Producer;
 use Hyperf\Amqp\Builder\QueueBuilder;
+use App\Common\QrcodeCommon;
 use function Hyperf\Support\env;
 
 #[AutoController]
@@ -42,7 +43,8 @@ class TestsController extends AbstractController
 
     public function index()
     {
-
+        return config('withdrawbankcode.vnd.qf888_pay')['VietinBank'];
+        return QrcodeCommon::generateQrCodeBase64('1111');
         return 555;
 
     }

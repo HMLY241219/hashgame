@@ -100,7 +100,7 @@ class WithdrawlogController extends AbstractController {
         $data['with_money_config'] = explode('|',$withConfig['with_money_config']); //系统最大退款金额
         $data['withdraw_fee_bili'] = $withConfig['withdraw_fee_bili']; //退款手续费比例
         $data['withdraw_fee_amount'] = $withConfig['withdraw_fee_amount']; //退款手续费固定值
-
+        $data['currency_and_ratio'] = $this->PayService->getCurrencyAndRatio(['status' => 1]);  //获取货币与比例配置
 
         $data['withdraw_info'] = $this->withdrawFiatCurrencyInfo($uid);
 
@@ -142,6 +142,7 @@ class WithdrawlogController extends AbstractController {
                 foreach ($digital_currency_protocol as $digital_currency){
                     if(in_array($digital_currency['id'],$refundmethod_type_array)){
                         if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
+                        if($digital_currency['digital_currency_url'])$digital_currency['digital_currency_url'] = Common::domain_name_path((string)$digital_currency['digital_currency_url']);
                         $value['refundmethod_type_array'][] = $digital_currency;
                     }
                 }
@@ -159,7 +160,7 @@ class WithdrawlogController extends AbstractController {
         foreach ($user_withinfo as &$v){
             if(!isset($data['user_withinfo'][$v['type']]))$data['user_withinfo'][$v['type']] = $v;
         }
-        $user_wallet_address =  $this->PayService->getUserWalletAddressInfo(['uid' => $uid]);
+        $user_wallet_address =  $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid]);
         if($user_wallet_address)foreach ($user_wallet_address as $wallet){
             $data['user_withinfo'][$wallet['type']] = $wallet;
         }
@@ -309,7 +310,7 @@ class WithdrawlogController extends AbstractController {
         $withdraw_type_id   = $this->request->post('withdraw_id_type_id') ?? 0;  //提现通道ID
         $refundmethod_type_id = $this->request->post('refundmethod_type_id') ?? 1; //退款方式ID:1=银行卡,2=UPI,3=钱包,4=数字货币
         $currency = $this->request->post('currency') ?? 'VND'; //货币
-        $protocol_name = $this->request->post('protocol_name') ?? ''; //数字货币协议
+
 
 
 
@@ -382,14 +383,15 @@ class WithdrawlogController extends AbstractController {
 
         //钱包与数字货币
         if(in_array($refundmethod_type_id,[3,4])){
-            $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
+            $user_withinfo = $this->PayService->getWithdrawWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
             $user_withinfo['email'] = '';
             $user_withinfo['phone'] = '';
         }else{
             //用户提现信息判断
-            $user_withinfo = $this->PayService->getUserWalletAddressInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
+            $user_withinfo = $this->PayService->getUserWithdrawInfo(['uid' => $uid,'id' => $user_withinfo_id],selectType: 2);
             if(!$user_withinfo)return $this->ReturnJson->failFul(260);
+            $user_withinfo['protocol_name'] = '';
         }
 
         //用户提现平台判断
@@ -501,7 +503,7 @@ class WithdrawlogController extends AbstractController {
             $this->setUserWithdrawLogInfo($userinfo,(int)$money);
             return $this->ReturnJson->successFul();
         }
-        $data['protocol_name'] = $protocol_name;
+        $data['protocol_name'] = $user_withinfo['protocol_name'];
         $data['jianame'] = $userinfo['jianame'];
         $apInfo = $this->withdraw->withdraw($data,$data['withdraw_type'],2);
         if($apInfo['code'] != 200) return $this->ReturnJson->failFul(246);
@@ -934,28 +936,53 @@ class WithdrawlogController extends AbstractController {
 
     }
 
+    /**
+     * no_pay提现回调
+     * @return string|void
+     */
+    #[RequestMapping(path:'nopayNotify')]
+    public function nopayNotify() {
+        $data = $this->request->all();
+
+        $this->logger->error('no_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));  //防止乱码
+
+        $ordersn=$data['merchantOrderNo'] ?? '';
+        $ordStatus= $data["state"] ?? '';
+
+
+        $status = $ordStatus == '3' ? 1 : 2;
+        $res = $this->Withdrawhandle($ordersn,$status,$data);
+
+        if($res['code'] == 200){
+            return 'SUCCESS';
+        }
+        $this->logger->error('no_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
+        return 'SUCCESS';
+    }
 
 
     /**
-     * rrpay提现回调
+     * qf888_pay提现回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'rrpayNotify')]
-    public function rrpayNotify() {
+    #[RequestMapping(path:'qf888payNotify')]
+    public function qf888payNotify() {
         $data = $this->request->all();
 
-        $this->logger->error('rrpay提现:'.json_encode($data));
-        $ordersn =$data['merchantOrderId'];
-        $status = $data["status"];  // 1 成功 2 失败
-        if(!$ordersn)return '';//订单信息错误
+        $this->logger->error('qf888_pay提现:'.json_encode($data,JSON_UNESCAPED_UNICODE));
+        $ordersn =$data['mchOrderId'];
+        $status = $data["isPaid"];  // 1 成功 2 失败
+        if(!$ordersn)return 'success';//订单信息错误
+        $status = $status == '1' ? 1 : 2;
         $res = $this->Withdrawhandle($ordersn,$status,$data);
 
         if($res['code'] == 200){
             return "success";
         }
-        $this->logger->error('rrpay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
-        return '';
+        $this->logger->error('qf888_pay提现事务处理失败==='.$res['msg'].'==ordersn=='.$ordersn);
+        return 'success';
     }
+
 
 
 

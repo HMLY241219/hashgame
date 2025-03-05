@@ -189,13 +189,13 @@ class Common
      */
     public static function log($ordersn,$response,$type){
 
-        Db::table('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($response),'type'=>$type,'createtime' => time()]);
+        Db::table('log')->insert(['out_trade_no'=> $ordersn,'log' => json_encode($response,JSON_UNESCAPED_UNICODE),'type'=>$type,'createtime' => time()]);
         if($type == 2 || $type == 4 || $type == 8){
             $withdraw_log = Db::table('withdraw_log')->selectRaw('id,uid,money,withdraw_money_other')->where('ordersn',$ordersn)->first();
             Db::table('withdraw_log')->where('ordersn',$ordersn)->update(['status' => 2,'finishtime' => time()]);
             //将三方错误日志，存储到第三张表中,是查询速度快一点
             Db::table('withdraw_logcenter')->where('withdraw_id',$withdraw_log['id'])->update([
-                'log_error' => json_encode($response),
+                'log_error' => json_encode($response,JSON_UNESCAPED_UNICODE),
             ]);
             //增加用户余额
             User::userEditCoin($withdraw_log['uid'],$withdraw_log['money'],5, "玩家系统处理提现失败" . $withdraw_log['uid'] . "退还提现金额" . bcdiv((string)$withdraw_log['money'],'100',2),3,1,$withdraw_log['withdraw_money_other']);

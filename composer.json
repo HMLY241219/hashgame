@@ -15,6 +15,7 @@
         "php": ">=8.1",
         "ext-bcmath": "*",
         "ext-curl": "*",
+        "endroid/qr-code": "5.0.0",
         "google/protobuf": "v3.25.5",
         "hyperf/amqp": "^3.1",
         "hyperf/cache": "~3.1.0",

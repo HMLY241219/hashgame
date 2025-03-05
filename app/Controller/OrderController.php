@@ -52,8 +52,9 @@ class OrderController extends AbstractController {
 
         //数字货币信息
         $data['digital_currency_payment_type'] = $this->getPaymentInfo($payment_type,$data['userinfo'],$digital_currency_protocol);
+
         //用户虚拟钱包地址
-        $data['user_wallet_address'] = Db::table('user_wallet_address')->selectRaw('id,address')->where('uid',$uid)->get()->toArray();
+        $data['user_wallet_address'] = $this->PayService->getPayWalletAddressInfo(['uid' => $uid],'id,address',2);
 
         if($sysConfig['payment_reminder_status'] == 1) $data['payment_reminder_status'] = 1;
         $data['bonus_pay_zs_water_multiple'] =  $sysConfig['bonus_pay_zs_water_multiple'];
@@ -579,6 +580,7 @@ class OrderController extends AbstractController {
                 foreach ($digital_currency_protocol as $digital_currency){
                     if(in_array($digital_currency['id'],$payment_type_array)){
                         if($digital_currency['icon'])$digital_currency['icon'] = Common::domain_name_path((string)$digital_currency['icon']);
+                        if($digital_currency['digital_currency_url'])$digital_currency['digital_currency_url'] = Common::domain_name_path((string)$digital_currency['digital_currency_url']);
                         $v['pay_type_array'][] = $digital_currency;
                     }
                 }
@@ -1257,30 +1259,30 @@ class OrderController extends AbstractController {
 
 
     /**
-     *kk_pay 支付回调
+     *qf888_pay 支付回调
      * @return false|string|void
      */
-    #[RequestMapping(path:'kkpayNotify')]
-    public function kkpayNotify() {
+    #[RequestMapping(path:'qf888payNotify')]
+    public function qf888payNotify() {
         $data = $this->request->all();
 
-        $this->logger->error('kk_pay充值:'.json_encode($data));
+        $this->logger->error('qf888_pay充值:'.json_encode($data));
 
 
-        $custOrderNo=$data['partnerOrderNo'] ?? '';
-        $ordStatus= $data['status'] ?? '';
-        if(!$custOrderNo)return 0;
-        $reallyPayMoney = (string)$data['amount'];
+        $custOrderNo=$data['mchOrderId'] ?? '';
+        $ordStatus= $data['isPaid'] ?? '';
+        if(!$custOrderNo)return 'success';
+        $reallyPayMoney = bcmul((string)$data['payAmount'],'100',0);
         if($ordStatus == '1'){
             $res = self::Orderhandle($custOrderNo,$reallyPayMoney);
             if($res['code'] == 200){
-                return 0;
+                return 'success';
             }
-            $this->logger->error('kk_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
+            $this->logger->error('qf888_pay充值事务处理失败==='.$res['msg'].'==ordersn=='.$custOrderNo);
 
             return 'fail';
         }
-        return 0;
+        return 'success';
     }
 
 
@@ -1298,8 +1300,8 @@ class OrderController extends AbstractController {
         if(!isset($data['txid']) || !$data['txid'])return 'ok';
         $payData = \App\Service\BlockApi\BlockApiService::getTransactionInfo($data['txid']);
         $this->logger->error('虚拟币回调解析充值数据:'.json_encode($payData));
-        $uid = Db::table('user_wallet_address')->where('address', $payData['from_address'])->value('uid');
-        if(!$uid){
+        $PayWalletAddress = $this->PayService->getPayWalletAddressInfo(['address' => $payData['from_address']],'uid',2);
+        if(!$PayWalletAddress){
             $this->logger->error('钱包地址未找到用户:'.json_encode($payData));
             return 'ok';
         }
@@ -1320,12 +1322,12 @@ class OrderController extends AbstractController {
         }
 
 
-        $userinfo = Db::table('userinfo')->selectRaw('total_pay_num,package_id,total_pay_score,channel')->where('uid',$uid)->first();
+        $userinfo = Db::table('userinfo')->selectRaw('total_pay_num,package_id,total_pay_score,channel')->where('uid',$PayWalletAddress['uid'])->first();
         //U赠送的赠送Bonus金额
         $payment_id_zs_bonus = $this->paymentIdZsBonus(['status' => 1,'currency' => $payData['symbol']],$pay_price, $userinfo['total_pay_num']);
 
         $createData = [
-            "uid"           => $uid,
+            "uid"           => $PayWalletAddress['uid'],
             "day"           => 0 ,
             "ordersn"  => $data['txid'],
             "paytype"       => $payData['symbol'],
