@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Amqp\Consumer;
 
 use App\Enum\EnumType;
+use App\Service\BaseService;
 use App\Service\BlockGamePeriodsService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
@@ -33,6 +34,7 @@ class BlockSettlementConsumer extends ConsumerMessage
         } else {
             $this->logger->error('BlockSettlementConsumer.Error.$data：' . var_export($data, true) );
             $this->logger->error('BlockSettlementConsumer.Error.$res：' . var_export($res, true) );
+            BaseService::setListCache(EnumType::QUEUE_PRODUCER_BLOCK_SETTLEMENT_EXCEPTION_LIST, json_encode($data));
             return Result::DROP;
         }
     }
