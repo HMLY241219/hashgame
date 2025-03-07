@@ -514,11 +514,8 @@ class OrderController extends AbstractController {
         $defaultMoney = explode(' ',$defaultMoney);
         $cash_money = $cash_money ? explode(' ',$cash_money) : [];
         $hot_config = $hot_config ? explode(' ',$hot_config) : [];
-        $this->logger->error('$defaultMoney:'.json_encode($defaultMoney));
-        $this->logger->error('$cash_money:'.json_encode($cash_money));
-        $this->logger->error('$hot_config:'.json_encode($hot_config));
-        $data = [];
 
+        $data = [];
         foreach ($defaultMoney as $key => $val){
             $this->logger->error('$key:'.$key);
             [$money,$bouns] = explode('|',$val);
@@ -531,7 +528,6 @@ class OrderController extends AbstractController {
                 'cash_bili' => $cash_money_bili,
             ];
 
-            $this->logger->error('$data:'.json_encode($data));
         }
         return [$data,$shop_id];
     }
@@ -559,9 +555,11 @@ class OrderController extends AbstractController {
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
-
+        $this->logger->error('defaultMoney'.json_encode($data['defaultMoney']));
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
+        $this->logger->error('$payment_type'.json_encode($payment_type));
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
+        $this->logger->error('payType'.json_encode($data['payType']));
         $data['fiat_currency_payment_type'] = $this->getPaymentInfo($payment_type,$userinfo);  //法币支付方式
         $data['userinfo'] = $userinfo;
         return $data;
