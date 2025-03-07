@@ -70,7 +70,7 @@ class PayService extends BaseService
         };
 
         if($selectType == 1)foreach ($payment_type as &$v){
-            if(isset($v['image']) && $v['image'])Common::domain_name_path($v['image']);
+            if(isset($v['image']) && $v['image'])$v['image'] = Common::domain_name_path($v['image']);
         }
         return $payment_type;
     }
