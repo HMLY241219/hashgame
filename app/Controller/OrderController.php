@@ -1251,7 +1251,7 @@ class OrderController extends AbstractController {
     #[RequestMapping(path:'htOrderApi')]
     public function htOrderApi(){
         $data = $this->request->all();
-        $res = self::Orderhandle($data['ordersn'],$data['price'],2);
+        $res = self::Orderhandle($data['ordersn'],$data['pay_price'],2);
         if($res['code'] == 200){
             return ['code' => $res['code'],'msg' => $res['msg'],'data' => []];
         }
