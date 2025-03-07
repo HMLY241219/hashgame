@@ -517,7 +517,6 @@ class OrderController extends AbstractController {
 
         $data = [];
         foreach ($defaultMoney as $key => $val){
-            $this->logger->error('$key:'.$key);
             [$money,$bouns] = explode('|',$val);
             [,$cash_money_bili] = $cash_money ? explode('|',$cash_money[$key]) : ['0','0'];
             [,$hot_status] = $hot_config ? explode('|',$hot_config[$key]) : ['0','0'];
