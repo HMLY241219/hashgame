@@ -159,6 +159,28 @@ class BaseService
     }
 
     /**
+     * 设置列表缓存
+     * @param string $hTbName
+     * @param $value
+     * @param int $expire
+     * @param string $pool
+     * @param int $dbIndex
+     * @return void
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function setListCache(string $hTbName, $value, int $expire = 0, string $pool = 'default', int $dbIndex = 4): void
+    {
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        $cache->rpush($hTbName, $value);
+        if ($expire > 0) {
+            $cache->expire($hTbName, $expire);
+        }
+    }
+
+    /**
      * 获取缓存
      * @param string $hTbName hash表名
      * @param string $pool 连接池
@@ -191,6 +213,22 @@ class BaseService
         $cache = Common::Redis($pool);
         $cache->select($dbIndex);
         return $cache->hGet($hTbName, $field);
+    }
+
+    /**
+     * 获取列表第一个元素
+     * @param string $hTbName
+     * @param string $pool
+     * @param int $dbIndex
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function getListFirstCache(string $hTbName, string $pool = 'RedisMy6379', int $dbIndex = 4)
+    {
+        $cache = Common::Redis($pool);
+        $cache->select($dbIndex);
+        return $cache->lpop($hTbName);
     }
 
     /**

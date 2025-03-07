@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Amqp\Consumer;
 
+use App\Enum\EnumType;
+use App\Service\BaseService;
 use App\Service\BlockApi\WebHookService;
 use Hyperf\Amqp\Result;
 use Hyperf\Amqp\Annotation\Consumer;
@@ -43,6 +45,7 @@ class BlockTransferBetConsumer extends ConsumerMessage
             if ($e->getCode() == 3017) {
                 return Result::REQUEUE;
             } else {
+                BaseService::setListCache(EnumType::QUEUE_PRODUCER_BLOCK_TRANSFER_BET_EXCEPTION_LIST, json_encode($data));
                 return Result::DROP;
             }
         }

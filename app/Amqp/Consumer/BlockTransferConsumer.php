@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Amqp\Consumer;
 
+use App\Enum\EnumType;
+use App\Service\BaseService;
 use App\Service\BlockApi\BlockApiService;
 use Hyperf\Amqp\Message\Type;
 use Hyperf\Amqp\Result;
@@ -35,7 +37,8 @@ class BlockTransferConsumer extends ConsumerMessage
             return Result::ACK;
         } else {
             $this->logger->alert('BlockTransferConsumer.Error.$data：' . var_export($data, true) );
-            return Result::REQUEUE;
+            BaseService::setListCache(EnumType::QUEUE_PRODUCER_BLOCK_TRANSFER_EXCEPTION_LIST, json_encode($data));
+            return Result::DROP;
         }
     }
 }
