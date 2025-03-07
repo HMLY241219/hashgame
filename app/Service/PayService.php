@@ -35,7 +35,7 @@ class PayService extends BaseService
 
         $data = [];
         if($selectType == 1)foreach ($currency_and_ratio as &$v){
-            if($v['image'])Common::domain_name_path($v['image']);
+            if($v['image'])$v['image'] = Common::domain_name_path($v['image']);
             if($type == 1)$data[$v['type']][$v['name']] = $v;
         }
 
