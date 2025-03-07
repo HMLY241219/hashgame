@@ -555,12 +555,13 @@ class OrderController extends AbstractController {
             $userinfo['total_pay_num'] = 0;$userinfo['total_pay_score'] = 0;$userinfo['coin'] = 0;$userinfo['package_id'] = 0;$userinfo['bonus'] = 0;
         }
         [$data['defaultMoney'],] = $this->getMoneyConfig($userinfo['total_pay_num'],$userinfo['total_pay_score'],$userinfo['coin'],$uid,$userinfo['package_id'],$userinfo['bonus']);
-        $this->logger->error('defaultMoney'.json_encode($data['defaultMoney']));
+
         $payment_type = $this->PayService->getPaymentType(['status' => 1,'currency' => $currency]);
-        $this->logger->error('$payment_type'.json_encode($payment_type));
+
         $data['payType'] = $this->getNewPayType($userinfo['package_id'],$uid,$userinfo,$payment_type ? $payment_type[0]['id'] : 1);
-        $this->logger->error('payType'.json_encode($data['payType']));
+
         $data['fiat_currency_payment_type'] = $this->getPaymentInfo($payment_type,$userinfo);  //法币支付方式
+
         $data['userinfo'] = $userinfo;
         return $data;
     }
