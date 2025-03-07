@@ -514,9 +514,13 @@ class OrderController extends AbstractController {
         $defaultMoney = explode(' ',$defaultMoney);
         $cash_money = $cash_money ? explode(' ',$cash_money) : [];
         $hot_config = $hot_config ? explode(' ',$hot_config) : [];
+        $this->logger->error('$defaultMoney:'.json_encode($defaultMoney));
+        $this->logger->error('$cash_money:'.json_encode($cash_money));
+        $this->logger->error('$hot_config:'.json_encode($hot_config));
         $data = [];
 
         foreach ($defaultMoney as $key => $val){
+            $this->logger->error('$key:'.$key);
             [$money,$bouns] = explode('|',$val);
             [,$cash_money_bili] = $cash_money ? explode('|',$cash_money[$key]) : ['0','0'];
             [,$hot_status] = $hot_config ? explode('|',$hot_config[$key]) : ['0','0'];
@@ -527,7 +531,7 @@ class OrderController extends AbstractController {
                 'cash_bili' => $cash_money_bili,
             ];
 
-
+            $this->logger->error('$data:'.json_encode($data));
         }
         return [$data,$shop_id];
     }
@@ -617,7 +621,7 @@ class OrderController extends AbstractController {
         $shop_id = 0;
         $pt_pay_count_config = Common::getConfigValue('pt_pay_count') ?: 0;
 //        if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0) && $this->getOrderIp((int)$uid)){  //首充充值商城判断  只能参加一次
-        $this->logger->error('pt_pay_count:'.$pt_pay_count);
+
         try {
             if($pt_pay_count <= bcsub((string)$pt_pay_count_config,'1',0)){  //首充充值商城判断  只能参加一次
                 $marketing_shop = Db::connection('readConfig')->table('marketing_shop')->selectRaw('id,bonus_config,cash_config,hot_config')->where(['type'=>'1'.$pt_pay_count,'user_type' => $user_type,'status' => 1,'currency' => $currency])->orderBy('weight','desc')->first();
@@ -649,7 +653,6 @@ class OrderController extends AbstractController {
                     $shop_id = $marketing_shop['id'];
                 }
             }
-            $this->logger->error('$marketing_shop:'.json_encode($marketing_shop));
 
 
 
@@ -663,10 +666,7 @@ class OrderController extends AbstractController {
             $this->logger->error('获取充值商城配置失败:'.$e->getMessage());
             $this->logger->error('获取充值商城currency:'.$currency);
         }
-        $this->logger->error('$marketing_shop2:'.json_encode($marketing_shop));
-        $this->logger->error('$cash_money:'.json_encode($cash_money));
-        $this->logger->error('$hot_config:'.json_encode($hot_config));
-        $this->logger->error('$defaultMoney:'.json_encode($defaultMoney));
+
         return [$defaultMoney,$cash_money,$hot_config,$shop_id];
 
     }
