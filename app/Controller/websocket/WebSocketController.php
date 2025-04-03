@@ -46,7 +46,7 @@ class WebSocketController implements OnMessageInterface, OnOpenInterface, OnClos
             $buf = new \WsProto\Block\ExceptionMsg();
             $buf->setCode(500);
             $buf->setMsg('The data format is invalid');
-            $resData = WSSocketService::sendDataFormat(MessageId::MSG_LATEST_BLOCK, $buf->serializeToJsonString());
+            $resData = WSSocketService::sendDataFormat(MessageId::MSG_EXCEPTION_MSG, $buf->serializeToJsonString());
             $response->push(new Frame(payloadData: $resData));
             return;
         }
