@@ -7,6 +7,8 @@ port2=9508
 # 服务ID
 serverId1=1
 serverId2=2
+# nginx配置文件路径
+nginxConfHttp=/www/server/panel/vhost/nginx/hashgamehttp.9507.conf
 
 # 检测端口是否可访问
 checkPort() {
@@ -30,24 +32,40 @@ stopPort() {
 
 # 启动服务
 startServer() {
-  if checkPort "$1"; then
-    # 重启端口
-    restartPort "$1" "$2"
-    echo "restarted $1"
+  if checkPort $port1; then
+    # 启动端口2服务
+    if checkPort $port2; then
+      restartPort $port2 $serverId2
+    else
+      startPort $port2 $serverId2
+    fi
+
+    # 修改nginx配置文件可用端口为端口2
+    sed -i "127.0.0.1/s/:$port1/:$port2/g" $nginxConfHttp
+    # 重启nginx
+    nginx -s reload
+
+    # 关闭端口1服务
+    stopPort $port1 $serverId1
+    echo "started $port2"
   else
-    # 启动端口
-    startPort "$1" "$2"
-    echo "started $1"
+    # 启动端口1服务
+    startPort $port1 $serverId1
+
+    # 修改nginx配置文件可用端口为端口1
+    sed -i "127.0.0.1/s/:$port2/:$port1/g" $nginxConfHttp
+    # 重启nginx
+    nginx -s reload
+
+    # 关闭端口2服务
+    stopPort $port2 $serverId2
+    echo "started $port1"
   fi
 }
 
 cd /www/server/panel/pyenv/bin/
-# 启动服务1
-startServer $port1 $serverId1
-# 睡眠3秒以便重启服务守护进程任务初始化完成
-sleep 3s
-# 启动服务2
-startServer $port2 $serverId2
+# 启动服务
+startServer
 
 # 修改nginx配置文件端口
 #  sed -i "s/:$port2/:$port1/g" $nginxConfSocket
