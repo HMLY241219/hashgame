@@ -41,7 +41,7 @@ startServer() {
     fi
 
     # 修改nginx配置文件可用端口为端口2
-    sed -i "127.0.0.1/s/:$port1/:$port2/g" $nginxConfHttp
+    sed -i "s/:$port1/:$port2/g" $nginxConfHttp
     # 重启nginx
     nginx -s reload
 
@@ -53,7 +53,7 @@ startServer() {
     startPort $port1 $serverId1
 
     # 修改nginx配置文件可用端口为端口1
-    sed -i "127.0.0.1/s/:$port2/:$port1/g" $nginxConfHttp
+    sed -i "s/:$port2/:$port1/g" $nginxConfHttp
     # 重启nginx
     nginx -s reload
 
