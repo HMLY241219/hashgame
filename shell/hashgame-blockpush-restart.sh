@@ -25,24 +25,26 @@ restartTask() {
 
 # 启动服务
 startServer() {
-  if checkPort "$1"; then
-    # 重启端口
-    restartTask "$1" "$2"
-    echo "restarted $1"
+  if checkPort $port1; then
+    # 重启端口1服务
+    restartPort $port1 $serverId1
+
+    echo "restarted $port1"
   else
-    # 启动端口
-    startTask "$1" "$2"
-    echo "started $1"
+    # 启动端口2服务
+    if checkPort $port2; then
+      restartPort $port2 $serverId2
+    else
+      startPort $port2 $serverId2
+    fi
+
+    echo "started $port2"
   fi
 }
 
 cd /www/server/panel/pyenv/bin/
 # 启动服务1
-startServer $port1 $serverId1
-# 睡眠3秒以便重启服务守护进程任务初始化完成
-sleep 3s
-# 启动服务2
-startServer $port2 $serverId2
+startServer
 
 # 修改nginx配置文件端口
 #  sed -i "s/:$port2/:$port1/g" $nginxConfSocket
