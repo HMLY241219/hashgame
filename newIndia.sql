@@ -2746,7 +2746,7 @@ CREATE TABLE `br_share_strlog` (
                                    `is_app` int(2) NOT NULL DEFAULT '0' COMMENT '	是否是App:1=是,0=否',
                                    `fbc` varchar(520) DEFAULT NULL COMMENT '橡素点的fbc',
                                    `is_agent_user` int(1) NOT NULL DEFAULT '0' COMMENT '是否是无限代用户 0-不是 1-是',
-                                   `agent` int(1) NOT NULL DEFAULT '0' COMMENT '是否是代理 1是 0否'
+                                   `agent` int(1) NOT NULL DEFAULT '0' COMMENT '是否是代理 1是 0否',
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
@@ -8576,7 +8576,7 @@ CREATE TABLE `br_userinfo` (
                                `withdraw_money` bigint(20) NOT NULL DEFAULT '0' COMMENT '可退款金额',
                                `withdraw_money_other` bigint(20) NOT NULL DEFAULT '0' COMMENT '其他可退款金额',
                                `bonus_cash` bigint(20) NOT NULL DEFAULT '0' COMMENT 'bonus转化cash金额',
-                               `reject_num` int(10) NOT NULL DEFAULT '0' COMMENT '退款处理中订单驳回次数'
+                               `reject_num` int(10) NOT NULL DEFAULT '0' COMMENT '退款处理中订单驳回次数',
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- --------------------------------------------------------
@@ -11259,4 +11259,136 @@ ALTER TABLE `br_user_wallet_address`
 
 ALTER TABLE `br_user_token`
     ADD INDEX `index_token`(`token`);
+
+
+
+
+
+--
+-- 表的结构 `br_share_strlog_backup`
+--
+
+CREATE TABLE `br_share_strlog_backup` (
+                                          `uid` bigint(15) NOT NULL COMMENT 'UID',
+                                          `puid` bigint(15) NOT NULL COMMENT '上级用户uid',
+                                          `googlesub` varchar(255) DEFAULT NULL COMMENT '谷歌登录用户唯一标识',
+                                          `account` varchar(255) DEFAULT NULL COMMENT '账号',
+                                          `password` varchar(64) DEFAULT NULL COMMENT '密码',
+                                          `nickname` varchar(255) DEFAULT NULL COMMENT '昵称',
+                                          `avatar` varchar(255) DEFAULT NULL COMMENT '头像',
+                                          `ip` varchar(128) DEFAULT NULL,
+                                          `phone` varchar(15) DEFAULT NULL COMMENT '电话',
+                                          `email` varchar(30) DEFAULT NULL COMMENT '邮箱',
+                                          `code` varchar(15) DEFAULT NULL COMMENT '邀请码',
+                                          `device_id` varchar(255) DEFAULT NULL COMMENT '设备号',
+                                          `gps` varchar(500) DEFAULT NULL COMMENT 'gsp',
+                                          `strlog` text,
+                                          `isgold` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否金币用户:0=真金,1=金币',
+                                          `pchannel` int(11) NOT NULL DEFAULT '0' COMMENT '推广渠道id',
+                                          `channel` int(11) NOT NULL DEFAULT '0' COMMENT '用户渠道id',
+                                          `remark` varchar(256) DEFAULT NULL,
+                                          `afid` varchar(256) DEFAULT NULL COMMENT 'appsflyer_id',
+                                          `appname` varchar(256) NOT NULL DEFAULT 'com.mxzf.ayay',
+                                          `last_login_time` int(11) DEFAULT NULL COMMENT '上次登录时间',
+                                          `createtime` int(11) DEFAULT NULL COMMENT '创建时间',
+                                          `adid` varchar(255) DEFAULT NULL COMMENT 'adjust的设备ID',
+                                          `gpsadid` varchar(255) DEFAULT NULL COMMENT '原始谷歌的广告ID',
+                                          `updatetime` int(11) DEFAULT NULL COMMENT '修改时间',
+                                          `package_id` int(11) NOT NULL DEFAULT '0' COMMENT '包id',
+                                          `login_ip` varchar(128) DEFAULT NULL COMMENT '登录IP',
+                                          `is_brushgang` int(11) NOT NULL DEFAULT '0' COMMENT '是否是刷子帮:1=是,0=否',
+                                          `jiaemail` varchar(50) DEFAULT NULL COMMENT '假email用户玩家没有绑定邮箱时支付使用',
+                                          `jiaphone` varchar(13) DEFAULT NULL COMMENT '系统生成的手机号',
+                                          `jianame` varchar(64) DEFAULT NULL COMMENT '用户的假名字',
+                                          `af_status` int(2) NOT NULL DEFAULT '0' COMMENT 'AF状态:1=是,0=否',
+                                          `city` varchar(64) DEFAULT NULL COMMENT '城市地区',
+                                          `last_pay_time` int(11) DEFAULT NULL COMMENT '最后一次支付时间',
+                                          `last_pay_price` bigint(20) NOT NULL DEFAULT '0' COMMENT '最后一次支付金额',
+                                          `status` int(2) NOT NULL DEFAULT '1' COMMENT '状态:1=正常,0=封号',
+                                          `shop_type` int(3) NOT NULL DEFAULT '0' COMMENT '	充值活动商场类型:6=新的破产活动,7=客损活动,10=首次充值	',
+                                          `brushgang_pay_status` int(2) NOT NULL DEFAULT '0' COMMENT '刷子帮是否只能走唤醒通道:1=是,0=否',
+                                          `tag` varchar(125) NOT NULL DEFAULT '' COMMENT '标签，多个使用逗号隔开: 1=停止自动提现',
+                                          `is_red` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否是网红 0-否 1-是',
+                                          `is_app` int(2) NOT NULL DEFAULT '0' COMMENT '	是否是App:1=是,0=否',
+                                          `fbc` varchar(520) DEFAULT NULL COMMENT '橡素点的fbc',
+                                          `fbp` varchar(255) DEFAULT NULL COMMENT '橡素点的fbp',
+                                          `is_agent_user` int(1) NOT NULL DEFAULT '0' COMMENT '是否是无限代用户 0-不是 1-是',
+                                          `agent` int(1) NOT NULL DEFAULT '0' COMMENT '是否是代理 1是 0否'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+
+--
+-- 表的索引 `br_share_strlog_backup`
+--
+ALTER TABLE `br_share_strlog_backup`
+    ADD PRIMARY KEY (`uid`),
+  ADD KEY `device_id` (`device_id`(191)),
+  ADD KEY `appname` (`appname`(191)),
+  ADD KEY `account` (`account`(191)),
+  ADD KEY `password` (`password`),
+  ADD KEY `phone` (`phone`);
+
+
+--
+-- 表的结构 `br_userinfo_backup`
+--
+
+CREATE TABLE `br_userinfo_backup` (
+                                      `uid` bigint(20) NOT NULL COMMENT '用户id',
+                                      `acc_type` int(11) DEFAULT '0' COMMENT '1=手机,2=谷歌,3=账号',
+                                      `channel` int(11) DEFAULT '0' COMMENT '渠道号',
+                                      `puid` int(11) DEFAULT '0' COMMENT '上级id',
+                                      `vip` int(11) DEFAULT '0' COMMENT '用户vip',
+                                      `coin` bigint(20) DEFAULT '0' COMMENT '当前余额',
+                                      `jiacoin` bigint(20) DEFAULT '0' COMMENT '假余额',
+                                      `bonus` bigint(20) DEFAULT '0' COMMENT 'Bonus',
+                                      `get_bonus` bigint(20) DEFAULT '0' COMMENT '获得的总Bonus',
+                                      `now_cash_score_water` bigint(20) DEFAULT '0' COMMENT '当前Cash流水',
+                                      `need_cash_score_water` bigint(20) DEFAULT '0' COMMENT '当前需要Cash的流水',
+                                      `now_bonus_score_water` bigint(15) NOT NULL DEFAULT '0' COMMENT '当前Bonus流水',
+                                      `need_bonus_score_water` bigint(15) NOT NULL DEFAULT '0' COMMENT '当前需要的Bonus流水',
+                                      `need_water_bonus` bigint(15) NOT NULL DEFAULT '0' COMMENT '当前需求流水对应的的Bonus',
+                                      `cash_total_score` bigint(20) DEFAULT '0' COMMENT 'Cash总输赢',
+                                      `bonus_total_score` bigint(15) NOT NULL DEFAULT '0' COMMENT 'Bonus总输赢',
+                                      `first_pay_score` int(11) DEFAULT '0' COMMENT '首充',
+                                      `total_pay_score` bigint(20) DEFAULT '0' COMMENT '总充值金额',
+                                      `total_give_score` bigint(20) DEFAULT '0' COMMENT '总赠送',
+                                      `total_pay_num` bigint(20) DEFAULT '0' COMMENT '总充值次数',
+                                      `total_exchange` bigint(20) DEFAULT '0' COMMENT '总提现金额',
+                                      `total_exchange_num` bigint(20) DEFAULT '0' COMMENT '总提现次数',
+                                      `total_cash_water_score` bigint(20) DEFAULT '0' COMMENT '总Cash流水',
+                                      `total_bonus_water_score` bigint(15) NOT NULL DEFAULT '0' COMMENT '总Bonus流水',
+                                      `total_game_num` bigint(20) DEFAULT '0' COMMENT '总游戏次数',
+                                      `total_game_day` bigint(20) DEFAULT '0' COMMENT '游戏天数',
+                                      `water_to_coins` bigint(20) DEFAULT '0' COMMENT 'vip流水返',
+                                      `total_water_to_coins` bigint(20) DEFAULT '0' COMMENT 'vip流水总返水',
+                                      `vip_back` bigint(20) DEFAULT '0' COMMENT 'vip推广返还',
+                                      `total_vip_back` bigint(20) DEFAULT '0' COMMENT 'vip总推广返还',
+                                      `regist_time` bigint(20) DEFAULT '0' COMMENT '注册时间',
+                                      `login_time` bigint(20) DEFAULT '0' COMMENT '登录时间',
+                                      `ip` varchar(20) DEFAULT '' COMMENT 'ip',
+                                      `status` tinyint(4) DEFAULT '0' COMMENT '用户状态',
+                                      `updatetime` bigint(20) DEFAULT '0' COMMENT '更新时间',
+                                      `first_pay_time` int(11) DEFAULT NULL COMMENT '首充时间',
+                                      `first_withdraw_time` int(11) DEFAULT NULL COMMENT '首次退款时间',
+                                      `update_num` bigint(20) DEFAULT '0' COMMENT '更新次数',
+                                      `des` varchar(30) DEFAULT NULL COMMENT '备注',
+                                      `package_id` int(10) DEFAULT '0' COMMENT '包名',
+                                      `commission_total` bigint(20) NOT NULL DEFAULT '0' COMMENT '累计已领取返佣金额',
+                                      `commission` bigint(20) NOT NULL DEFAULT '0' COMMENT '可领取返佣金额',
+                                      `self_cash_water_score` bigint(20) NOT NULL DEFAULT '0' COMMENT '自研游戏Cash流水',
+                                      `self_bonus_water_score` bigint(20) NOT NULL DEFAULT '0' COMMENT '自研游戏Bonus流水',
+                                      `withdraw_money` bigint(20) NOT NULL DEFAULT '0' COMMENT '可退款金额',
+                                      `withdraw_money_other` bigint(20) NOT NULL DEFAULT '0' COMMENT '其他可退款金额',
+                                      `bonus_cash` bigint(20) NOT NULL DEFAULT '0' COMMENT 'bonus转化cash金额',
+                                      `reject_num` int(10) NOT NULL DEFAULT '0' COMMENT '退款处理中订单驳回次数'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+--
+-- 表的索引 `br_userinfo_backup`
+--
+ALTER TABLE `br_userinfo_backup`
+    ADD PRIMARY KEY (`uid`);
 

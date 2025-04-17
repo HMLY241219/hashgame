@@ -10,7 +10,12 @@ declare(strict_types=1);
  */
 
 namespace App\Controller;
+use App\Amqp\Producer\TaskProgressProducer;
 use App\Common\Guzzle;
+use App\Common\Message;
+use App\Enum\EnumType;
+use Hyperf\Amqp\Producer;
+use Hyperf\Context\ApplicationContext;
 use Hyperf\HttpServer\Annotation\Controller;
 use Hyperf\HttpServer\Annotation\RequestMapping;
 use Hyperf\Di\Annotation\Inject;
@@ -18,6 +23,7 @@ use Hyperf\DbConnection\Db;
 use App\Common\Common;
 use function Hyperf\Config\config;
 use function Hyperf\Coroutine\co;
+use function Hyperf\Support\env;
 
 
 #[Controller(prefix:"Auth")]
@@ -39,6 +45,7 @@ class AuthController extends AbstractController
     //代理渠道
     private array $agentChannel = [5030,5020,5010];
 
+
     private string $googleClientId = '262294838288-srsnim6tq5e06c45vfjh3kn1v0t53567.apps.googleusercontent.com';
     #[RequestMapping(path: "Login", methods: "get,post")	]
     public function login(){
@@ -57,7 +64,7 @@ class AuthController extends AbstractController
             $this->logger->info("包名传入有误!");
             return $this->ReturnJson->failFul(206);
         }
-        $this->logger->error('packname'.$packname);
+//        $this->logger->error('packname'.$packname);
         if($logintype == 1){ //手机登录
             $phone = $this->request->post('phone');
             $password = $this->request->post('password');
@@ -72,11 +79,17 @@ class AuthController extends AbstractController
                     ->where([['phone','=',$phone],['password','=', md5($password)],['package_id','=',$package_id]])
                     ->orderBy('uid','desc')
                     ->first();
-                if(!$userData) return $this->ReturnJson->failFul(210);
+                if(!$userData){
+                    //用户删除检测
+                    $userData = $this->getUserBackup($phone,$package_id,1,$password);
+                    if(!$userData)return $this->ReturnJson->failFul(210);
+                }
                 if($userData['status'] != 1)return $this->ReturnJson->failFul(261);
 
                 //召回统计
                 $this->recallolUser($userData['uid'], $package_id, $userData['last_login_time'], $userData['channel']);
+
+
             }else{
                 $res = Db::table('share_strlog')
                     ->select('uid')
@@ -100,7 +113,11 @@ class AuthController extends AbstractController
                     ->where([['googlesub','=',$sub],['package_id','=',$package_id]])
                     ->orderBy('uid','desc')
                     ->first();
-                if(!$userData)return $this->ReturnJson->failFul(214);
+                //用户删除检测
+                if(!$userData){
+                    $userData = $this->getUserBackup($sub,$package_id,2);
+                    if(!$userData)return $this->ReturnJson->failFul(210);
+                }
                 if($userData['login_status'] != 1)return $this->ReturnJson->failFul(261);
 
                 //召回统计
@@ -160,7 +177,11 @@ class AuthController extends AbstractController
                     ->where([['account','=',$account],['password','=',md5($password)],['package_id','=',$package_id]])
                     ->orderBy('uid','desc')
                     ->first();
-                if(!$userData) return $this->ReturnJson->failFul(210);
+                //用户删除检测
+                if(!$userData){
+                    $userData = $this->getUserBackup($account,$package_id,3,$password);
+                    if(!$userData)return $this->ReturnJson->failFul(210);
+                }
                 if($userData['status'] != 1)return $this->ReturnJson->failFul(261);
 
                 //召回统计
@@ -176,6 +197,8 @@ class AuthController extends AbstractController
                 ->where([['account','=',$account],['package_id','=',$package_id]])
                 ->orderBy('uid','desc')
                 ->first();
+            //用户删除检测
+            if(!$userData)$userData = $this->getUserBackup($account,$package_id,4);
             if($userData){
                 if($userData['status'] != 1)return $this->ReturnJson->failFul(261);
                 $userData['is_login'] = 1;
@@ -204,6 +227,12 @@ class AuthController extends AbstractController
         $userData['token'] = $this->setUserToken((int)$userData['uid']);
         $userData['tawkHash'] = hash_hmac('sha256',$userData['jiaemail'],'89553b729f0570a1c75248f8b02f8986cd20f5a9');
         $userData['avatar'] = $userData['avatar'] ? Common::domain_name_path($userData['avatar']) : '';
+        if(!isset($userData['register_send_status']))$userData['register_send_status'] = 0; //注册赠送默认不弹出
+
+
+        //判断是否可以领取马甲包下载APK奖励
+        $isnotmjb = $this->request->post('isnotmjb') ?? 0; //是否不是马甲包:1=是,0=否
+        if(in_array($package_id,config('my.sendBonusMjbPackageId')))$userData['mjbSendBonus'] = $this->mjbSendBonusLog($userData['uid'],$isnotmjb);
 
 
         return $this->ReturnJson->successFul(200,$userData);
@@ -231,6 +260,9 @@ class AuthController extends AbstractController
 
         $share_strlog = Db::table('share_strlog')->select('uid')->where([['phone','=',$phone],['package_id','=',$package_id]])->first();
         if($share_strlog)return $this->ReturnJson->failFul(221);//抱歉!手机号已被占用;
+        //用户删除检测
+        $share_strlog_backup = Db::table('share_strlog_backup')->select('uid')->where([['phone','=',$phone],['package_id','=',$package_id]])->first();
+        if($share_strlog_backup)return $this->ReturnJson->failFul(221);//抱歉!手机号已被占用;
 
 //        Db::table('share_strlog')->where('uid',$uid)->update(['phone' => $phone,'password' => md5($password)]);
         Db::table('share_strlog')->where('uid',$uid)->update(['phone' => $phone]);
@@ -263,6 +295,9 @@ class AuthController extends AbstractController
             if(!$share_strlog)return $this->ReturnJson->failFul(217);//抱歉!老密码输入错误!
         }
         Db::table('share_strlog')->where('uid',$share_strlog['uid'])->update(['password' => md5($password)]);
+
+        //发送消息
+        Message::messageSelect(10, ['uid'=>$uid]);
         return $this->ReturnJson->successFul();
     }
 
@@ -316,9 +351,9 @@ class AuthController extends AbstractController
         $uid = $this->GetUid();
 
         if($logintype == 4){ //黑名单处理
-            $filed_array = ['phone' =>$phone,'ip' => $ip,'deviceid' => $device_id];
+            $filed_array = ['phone' =>$phone,'ip' => $ip];
         }else{
-            $filed_array = ['ip' => $ip,'deviceid' => $device_id];
+            $filed_array = ['ip' => $ip];
         }
 
 
@@ -338,6 +373,7 @@ class AuthController extends AbstractController
             return ['code' => 212,'msg' => 'Sorry! The service is temporarily unavailable','data' => []];
         }
 
+        $is_agent = 0;
         if(!$apppackage['hide']){  //闪退或者不投放，直接A
             $chanelid = 0;
         }else{
@@ -390,6 +426,7 @@ class AuthController extends AbstractController
                     }
                     $bindData['clickLabel'] = isset($bindData['clickLabel']) ? base64_decode($bindData['clickLabel']) : 0;
                     $chanelinfo = Db::table('share_strlog')->where('uid',$bindData['clickLabel'])->first();
+                    $agent_info = $chanelinfo;
                     if ($chanelinfo && $bindData['clickLabel'] != $uid) {
                         $puid = $bindData['clickLabel'];  //上级用户uid
                         $pchanelid = $chanelinfo['channel'];  //上级用户渠道id
@@ -427,17 +464,48 @@ class AuthController extends AbstractController
 
                         }
 
+                        //如果上级是无限代
+                        if ($agent_info['is_agent_user'] == 1){
+                            //新用户数据
+                            $share_user_data = [
+                                'uid' => $uid,
+                                'puid' => $puid,
+                                'nickname' => $nickname,
+                                'avatar' => $avatar,
+                                'channel' => $chanelid,
+                                'appname' => $packname,
+                                'phone' => $phone,
+                                'package_id' => $package_id,
+                            ];
+
+                            $agent_type = 0;
+                            $level_z = 1;
+                            $agent = Db::table('agent')->where('uid',$puid)->first();
+                            if (!empty($agent)){
+                                $level_z = $agent['level'] + 1;
+                                if (in_array($agent['type'], [2,3])){
+                                    switch ($agent['type']){
+                                        case 2:
+                                            $agent_type = 3;
+                                            break;
+                                        case 3:
+                                            $agent_type = 1;
+                                            break;
+                                        default:
+                                            $agent_type = 0;
+                                            break;
+                                    }
+                                }
+                            }
+                            $is_agent = Common::setTeamLevel($uid, $puid, $agent_type, 0, $share_user_data, $level_z);
+                            $is_agent_user = 1;
+                        }
+
                     }
 
 
                 }
 
-                //代理用户
-                if (isset($bindData['agent_admin'])) {
-                    if ($bindData['agent_admin'] == 1) {
-                        $is_agent_user = 1;
-                    }
-                }
             } else { //parm为空的时候
                 if($this->isNatureStatus() && $ip_login_status === 1) $isgold = 0;
             }
@@ -523,6 +591,7 @@ class AuthController extends AbstractController
             'fbp' => $fbp,
             'fbc' => $fbc,
             'is_agent_user' => $is_agent_user,
+            'agent' => $is_agent,
         ];
 
         $res = Db::table('share_strlog')->insert($share_strlog_data);
@@ -562,6 +631,10 @@ class AuthController extends AbstractController
         //处理每日注册
         $this->setRegist($uid,$chanelid,$package_id);
 
+        //处理注册赠送
+        $register_send_status = $this->registerSend($uid);//1=可以弹出领取，0=不能弹出领取
+
+
         //fb注册打点
         if($fb_login_status && $fbc)$this->Adjust->fbUploadEvent($packname,0,false,'',$uid,$share_strlog_data,2);
         //AF注册打点
@@ -570,11 +643,64 @@ class AuthController extends AbstractController
         if($fb_login_status)$this->Adjust->adjustUploadEvent($packname,$gpsid,$adid,0,false,'',$share_strlog_data,2);
 
 
-
-
-        return ['code' => 200,'msg' => '成功','data' => ['uid' => $uid,'code'=>$code,'phone' => $phone,'email' => $email,'nickname' => $nickname,'avatar' => $avatar,'package_id' => $package_id,'channel' => $chanelid,'jiaemail' => $share_strlog_data['jiaemail']]];
+        return ['code' => 200,'msg' => '成功','data' => ['uid' => $uid,'code'=>$code,'phone' => $phone,'email' => $email,'nickname' => $nickname,'avatar' => $avatar,'package_id' => $package_id,'channel' => $chanelid,'jiaemail' => $share_strlog_data['jiaemail'],'register_send_status' => $register_send_status]];
 
     }
+
+
+    /**
+     * 马甲包下载Apk赠送
+     * @param $uid
+     * @param $isnotmjb
+     * @return int
+     */
+    private function mjbSendBonusLog($uid,$isnotmjb):int{
+        $mjb_cash_send_log = Db::table('mjb_bonus_send_log')
+            ->selectRaw('bonus,status,isnotmjb')
+            ->where('uid',$uid)
+            ->first();
+        if(!$mjb_cash_send_log && $isnotmjb == 0){
+            Db::table('mjb_bonus_send_log')
+                ->insert([
+                    'isnotmjb' => $isnotmjb,
+                    'uid' => $uid,
+                    'createtime' => time(),
+                ]);
+        }elseif($mjb_cash_send_log && $isnotmjb == 1){
+            if($mjb_cash_send_log['isnotmjb'] == 0) Db::table('mjb_bonus_send_log')->where('uid',$uid)->update(['isnotmjb' => 1]);
+            if($mjb_cash_send_log['status'] != 0 || $mjb_cash_send_log['isnotmjb'] != 0 || $mjb_cash_send_log['bonus'] <= 0)return 0;
+            return $mjb_cash_send_log['bonus'];
+        }
+        return 0;
+    }
+
+
+    /**
+     * 注册赠送
+     * @param $uid 用户uid
+     * @return int
+     */
+    private function registerSend($uid):int{
+        //注册赠送Cash
+        $register_send_cash = Common::getConfigValue('register_send_cash');
+        if($register_send_cash){
+            $glUidArray = \App\Common\My::glUid($uid); //获取我的关联用户
+            $register_send_log_count = Db::table('register_send_log')->whereIn('uid',$glUidArray)->count(); //获取关联数量
+            if(!$register_send_log_count){
+                Db::table('register_send_log')->insert([
+                    'uid' => $uid,
+                    'cash' => $register_send_cash,
+                    'createtime' => time(),
+                ]);
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+
+
+
 
     /**
      * 获取用户的默认VIP等级
@@ -639,6 +765,14 @@ class AuthController extends AbstractController
     }
 
 
+    /**
+     *
+     * @return void
+     */
+    private function setIpSieveBehaviorLog($uid,$ip){
+
+    }
+
 
     /**
      * 设置用户token
@@ -651,7 +785,7 @@ class AuthController extends AbstractController
             ['uid' => $uid],
             ['token' => $token]
         );
-        $Redis = Common::Redis();
+        $Redis = Common::Redis('Redis5501');
         $Redis->hSet('php_login_1_1', (string)$uid, (string)$token);
         return $token;
     }
@@ -727,7 +861,7 @@ class AuthController extends AbstractController
                     //$puid_info = Db::table('userinfo')->where('uid',$uid)->first();
 
                     //$user_water = Db::table('user_water')->where('uid', $puid)->first();
-                    $user_water = Db::table('commission_log')->where('puid', $puid)->where('level',1)
+                    /*$user_water = Db::table('commission_log')->where('puid', $puid)->where('level',1)
                         ->selectRaw('IFNULL(SUM(BetAmount),0) as total_cash_water_score')
                         ->first();
                     $turntable_config = config('turntable');
@@ -758,7 +892,7 @@ class AuthController extends AbstractController
                         $start = $turntable_config['range_zs_money'][0][0] * 100;
                         $end = $turntable_config['range_zs_money'][0][1] * 100;
                     }
-                    $money = mt_rand((int)$start, (int)$end) / 100;
+                    $money = mt_rand((int)$start, (int)$end) / 100;*/
 
                     /*if ($turntable_user_count <= 5){
                         $money = mt_rand(5, 15) / 100;
@@ -771,7 +905,7 @@ class AuthController extends AbstractController
                             $money = 0;
                         }
                     }*/
-                    Db::table('turntable')->where('id',$turntable_id)->increment('money', $money);
+                    //Db::table('turntable')->where('id',$turntable_id)->increment('money', $money);
                 }
 
                 Db::table('user_team')->insert([
@@ -829,6 +963,7 @@ class AuthController extends AbstractController
     }
 
     /**
+     * 这里每次更新服务器需要把强制加10000的关闭掉
      * 设置首次登录用户的uid
      * @param $package_id 包名
      * @param $logintype 登录类型
@@ -1083,6 +1218,23 @@ class AuthController extends AbstractController
                             'num' => 1,
                         ]);
                 }
+
+                $ltv = Db::table('statistics_ltv')->where([['time','=',strtotime('00:00:00')],['package_id','=',$package_id],['channel','=',$channel],['type','=',1]])
+                    ->update([
+                        'num' => Db::raw('num + 1')
+                    ]);
+
+                if(!$ltv){
+                    Db::table('statistics_ltv')
+                        ->insert([
+                            'time' => strtotime('00:00:00'),
+                            'package_id' => $package_id,
+                            'channel' => $channel,
+                            'type' => 1,
+                            'num' => 1,
+                        ]);
+                }
+
             } catch (\Throwable $e) {
                 // 捕获异常并处理
                 $this->logger->error('注册处理用户留存数据系统发送错误:' . $e->getMessage());
@@ -1180,6 +1332,44 @@ class AuthController extends AbstractController
         if($recallold_statistics)Db::table('recallold_statistics')->where('id',$recallold_statistics['id'])->update([
             'recallold_num' => Db::raw('recallold_num + 1')
         ]);
+
+    }
+
+
+    /**
+     * 判断用户是否已经存在
+     * @param $uid
+     * @param $login_type 1=手机,2=谷歌,3=账号,4=游客
+     * @return void
+     */
+    private function getUserBackup($info,$package_id,$login_type = 1,$password = ''){
+        $query = Db::connection('readConfig')
+            ->table('share_strlog_backup');
+        match ($login_type){
+            1 => $query->where([['phone','=',$info],['password','=', md5($password)],['package_id','=',$package_id]]),
+            2 => $query->where([['googlesub','=',$info],['package_id','=',$package_id]]),
+            3 => $query->where([['account','=',$info],['password','=', md5($password)],['package_id','=',$package_id]]),
+            default => $query->where([['account','=',$info],['package_id','=',$package_id]])
+        };
+
+        $share_strlog = $query->orderBy('uid','desc')
+            ->first();
+        if(!$share_strlog)return [];
+        $userinfo = Db::connection('readConfig')
+            ->table('userinfo_backup')
+            ->where('uid',$share_strlog['uid'])
+            ->first();
+        if(!$userinfo)return [];
+        try {
+            Db::table('share_strlog')->insert($share_strlog);
+            Db::table('userinfo')->insert($userinfo);
+        }catch (\Throwable $e){
+            $this->logger->error('用户数据回滚失败:'.$e->getMessage());
+        }
+
+        Db::table('share_strlog_backup')->where('uid',$share_strlog['uid'])->delete();
+        Db::table('userinfo_backup')->where('uid',$share_strlog['uid'])->delete();
+        return $share_strlog;
 
     }
 }
