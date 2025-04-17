@@ -464,42 +464,6 @@ class AuthController extends AbstractController
 
                         }
 
-                        //如果上级是无限代
-                        if ($agent_info['is_agent_user'] == 1){
-                            //新用户数据
-                            $share_user_data = [
-                                'uid' => $uid,
-                                'puid' => $puid,
-                                'nickname' => $nickname,
-                                'avatar' => $avatar,
-                                'channel' => $chanelid,
-                                'appname' => $packname,
-                                'phone' => $phone,
-                                'package_id' => $package_id,
-                            ];
-
-                            $agent_type = 0;
-                            $level_z = 1;
-                            $agent = Db::table('agent')->where('uid',$puid)->first();
-                            if (!empty($agent)){
-                                $level_z = $agent['level'] + 1;
-                                if (in_array($agent['type'], [2,3])){
-                                    switch ($agent['type']){
-                                        case 2:
-                                            $agent_type = 3;
-                                            break;
-                                        case 3:
-                                            $agent_type = 1;
-                                            break;
-                                        default:
-                                            $agent_type = 0;
-                                            break;
-                                    }
-                                }
-                            }
-                            $is_agent = Common::setTeamLevel($uid, $puid, $agent_type, 0, $share_user_data, $level_z);
-                            $is_agent_user = 1;
-                        }
 
                     }
 
