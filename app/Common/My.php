@@ -162,6 +162,52 @@ class My
     }
 
 
+    /**
+     * 返回自己注册之前是否有关联用户，用于限制活动只能参与一次 1 = 可以参加活动 0 = 不能参加活动
+     * @return int
+     * @param $uid 用户的uid
+     */
+    public static function activeBeforeGlUidStatus($uid){
+
+        $share_strlog = Db::table('share_strlog')->selectRaw('phone,ip')->where('uid',$uid)->first();
+
+
+        $query = Db::table('share_strlog')->where('uid', '<', $uid);
+
+        if ($share_strlog['phone'] && $share_strlog['ip']) {
+            $query->where(function ($q) use ($share_strlog) {
+                $q->where('phone', $share_strlog['phone'])
+                    ->orWhere('ip', $share_strlog['ip']);
+            });
+        } elseif ($share_strlog['phone']) {
+
+            $query->where('phone', $share_strlog['phone']);
+
+        } elseif ($share_strlog['ip']) {
+
+            $query->where('ip', $share_strlog['ip']);
+
+        }else{
+            return 1;
+        }
+
+        $GlUid = $query->value('uid');
+        if($GlUid)return 0;
+
+
+        $user_withinfo = Db::table('user_withinfo')->selectRaw('id,account')->where('uid',$uid)->first();
+        if(!$user_withinfo)return 1;
+
+
+        $GlId = Db::table('user_withinfo')
+            ->where([
+                ['id','<',$user_withinfo['id']],
+                ['account','=',$user_withinfo['account']],
+            ])->value('id');
+
+        if(!$GlId)return 1;
+        return 0;
+    }
 
 
     /**
