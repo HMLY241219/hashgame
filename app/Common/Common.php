@@ -323,4 +323,32 @@ class Common
 
         return $upperOrLower === 1 ? strtoupper($prefix . $code) : strtolower($prefix . $code);
     }
+
+
+    /**
+     * 设置免费次数
+     * @param $uid
+     * @param $game_id
+     * @param $num
+     * @return int
+     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \RedisException
+     */
+    public static function setFreeNum($uid, $game_id, $num)
+    {
+        $Redis5502 = Common::Redis('Redis5502');
+        $old_num = $Redis5502->hGet('user_'.$uid, $game_id.'_free_num');
+        $num = $old_num > 0 ? $old_num + $num : $num;
+        $free_num_time = Common::getConfigValue('free_num_time');
+
+        $data = [
+            $game_id.'_free_num' => $num,
+            $game_id.'_free_time' => time() + $free_num_time,//(86400*5),
+        ];
+        $Redis5502->hMSet('user_'.$uid, $data);
+        $Redis5502->expire('user_'.$uid, 3600*24*5);
+
+        return 1;
+    }
 }
