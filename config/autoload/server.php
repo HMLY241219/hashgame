@@ -32,10 +32,12 @@ $serverWs = [
     'name' => env('SERVER_NAME_WS', 'ws'),
     'type' => Server::SERVER_WEBSOCKET,
     'host' => '0.0.0.0',
-    'port' => (int)env('SERVER_PORT_HTTP', 9502),
+    'port' => (int)env('SERVER_PORT_WS', 9502),
     'sock_type' => SWOOLE_SOCK_TCP,
     'callbacks' => [
-        Event::ON_REQUEST => [Hyperf\HttpServer\Server::class, 'onRequest'],
+        Event::ON_HAND_SHAKE => [Hyperf\WebSocketServer\Server::class, 'onHandShake'],
+        Event::ON_MESSAGE => [Hyperf\WebSocketServer\Server::class, 'onMessage'],
+        Event::ON_CLOSE => [Hyperf\WebSocketServer\Server::class, 'onClose'],
     ],
     'settings' => [
         Constant::OPTION_OPEN_WEBSOCKET_PING_FRAME => true,
