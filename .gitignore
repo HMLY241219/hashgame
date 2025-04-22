@@ -13,4 +13,3 @@ vendor/
 *.cache
 .vscode/
 app/Controller/TestController.php
-config/autoload/server.php
