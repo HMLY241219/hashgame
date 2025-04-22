@@ -36,6 +36,9 @@ class User extends AbstractController
         19 => 'cash_task_water_multiple', //	任务积分Cash流水倍数
         20 => 'cash_newcashback_water_multiple', //	新版反水Cash流水倍数
         21 => 'cash_orderactive_water_multiple', //	活动日活动Cash流水倍数
+        22 => 'cash_register_water_multiple', //	注册赠送Cash流水倍数
+        23 => 'cash_redemption_code_multiple', //	兑换码Cash流水倍数
+        24 => 'cash_free_water_multiple', //	免费游戏Cash流水倍数
     ];
 
     protected static $bonus_water_multiple = [  //Bonus流水倍数
@@ -58,8 +61,22 @@ class User extends AbstractController
         19 => 'bonus_task_water_multiple', //任务积分Bonus流水倍数
         20 => 'bonus_newcashback_water_multiple', //	新版反水Bonus流水倍数
         21 => 'bonus_orderactive_water_multiple', //	活动日活动Bonus流水倍数
+        22 => 'bonus_register_water_multiple', //	注册赠送Bonus流水倍数
+        23 => 'bonus_redemption_code_multiple', //	兑换码Bonus流水倍数
+        24 => 'bonus_free_water_multiple', //	免费游戏bonus流水倍数
+        25 => 'bonus_bankruptcy_one_water_multiple', //	新破产活动1Bonus流水
+        26 => 'bonus_bankruptcy_two_water_multiple', //	新破产活动2Bonus流水
+        27 => 'bonus_bankruptcy_three_water_multiple', //	新破产活动3Bonus流水
+        28 => 'bonus_firstthreeday_one_water_multiple', //	首充3天活动Bonus流水倍数
+        29 => 'bonus_firstthreeday_two_water_multiple', //	首充3天活动2Bonus流水倍数
+        30 => 'bonus_firstthreeday_three_water_multiple', // 首充3天活动3Bonus流水倍数
+        31 => 'bonus_newcustomer_one_water_multiple', // 新客损1活动
+        32 => 'bonus_newcustomer_two_water_multiple', // 新客损2活动
+        33 => 'bonus_newcustomer_three_water_multiple', // 新客损3活动
+        34 => 'bonus_newcustomer_four_water_multiple', // 新客损4活动
+        35 => 'bonus_newcustomer_five_water_multiple', // 新客损5活动,
+        36 => 'bonus_newrankings_water_multiple', // 新排行榜Bonus流水倍数,
     ];
-
     /**
      * 用户Coin变化
      * @param $uid
