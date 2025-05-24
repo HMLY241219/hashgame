@@ -25,5 +25,6 @@ mysqldump -u ${DB_USER_NAME} -p${DB_PASSWORD} \
 --routines \
 --triggers \
 --events \
+--no-data \
 ${IGNORE_TABLES[@]} \
 ${DB_NAME} > "/tmp/${DB_NAME}_backup_$(date +%Y%m%d).sql"
