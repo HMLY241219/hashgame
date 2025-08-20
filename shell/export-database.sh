@@ -16,6 +16,12 @@ while read -r TABLE; do
     IGNORE_TABLES+=("--ignore-table=${DB_NAME}.${TABLE}")
 done < ${TMP_IGNORE_TABLES}
 
+# 忽略备份表
+IGNORE_TABLES+=("--ignore-table=${DB_NAME}.br_withdraw_log_backup")
+IGNORE_TABLES+=("--ignore-table=${DB_NAME}.br_order_backup")
+IGNORE_TABLES+=("--ignore-table=${DB_NAME}.br_userinfo_backup")
+IGNORE_TABLES+=("--ignore-table=${DB_NAME}.br_share_strlog_backup")
+
 # 删除临时文件
 rm -f ${TMP_IGNORE_TABLES}
 
